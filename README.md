@@ -29,7 +29,7 @@ the momentum method (Nesterov's momentum).
 To use Synaptic, first add this to your `project.clj`:
 
 ```
-[synaptic "0.1.0-SNAPSHOT"]
+[synaptic "0.1.0"]
 ```
 
 You can then experiment in the REPL as follows:
@@ -55,7 +55,7 @@ REPL to make sure you have enough memory to load the training set.
 
 Synaptic ships with a subset of the
 [MNIST handwritten digit](http://yann.lecun.com/exdb/mnist/)
-training data available on Yan LeCun's website, so you can experiment.
+training data available on Yann LeCun's website, so you can experiment.
 
 But you can also easily create your own training set:
 
