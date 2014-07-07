@@ -1,6 +1,6 @@
 # synaptic
 
-Synaptic is a Neural Networks library written in Clojure.
+[Synaptic](http://chopp.in/clj/synaptic/) is a Neural Networks library written in Clojure.
 
 It is intendend to be used for experimenting with various neural network
 architectures and learning algorithms, as well as to solve real-life
@@ -28,9 +28,7 @@ the momentum method (Nesterov's momentum).
 
 To use Synaptic, first add this to your `project.clj`:
 
-```
-[synaptic "0.1.0"]
-```
+[![Clojars Project](http://clojars.org/synaptic/latest-version.svg)](http://clojars.org/synaptic)
 
 You can then experiment in the REPL as follows:
 
