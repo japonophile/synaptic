@@ -13,7 +13,7 @@
 
 
 (defrecord Arch [layers act-fn])
-(defrecord Stats [epochs tr-err val-err])
+(defrecord Stats [epochs tr-err val-err tr-cl-err val-cl-err])
 (defrecord Training [algo params state stats])
 (defrecord Net [arch weights training])
 
@@ -682,7 +682,7 @@
   "Create training statistics for a neural network.  Stats will be updated
   as the training progresses."
   [^Net nn]
-  (Stats. 0 [] []))
+  (Stats. 0 [] [] [] []))
 
 (defn init-stats
   "Initialize training statistics"
@@ -694,10 +694,14 @@
 (defn update-stats
   "Update training statistics of the neural network, using a training set."
   [^Net nn ^TrainingSet trset]
-  (let [[trerr valerr] (training-error nn trset)]
+  (let [[trerr   valerr]   (training-error nn trset)
+        [trclerr valclerr] (if (-> nn :training :params :stats :misclassification)
+                             (training-error :misclassification nn trset))]
     (-> nn
-      (update-in [:training :stats :tr-err] conj trerr)
-      (update-in [:training :stats :val-err] #(if valerr (conj % valerr) []))
+      (update-in [:training :stats :tr-err]                    conj   trerr)
+      (update-in [:training :stats :val-err]    #(if valerr   (conj % valerr)   %))
+      (update-in [:training :stats :tr-cl-err]  #(if trclerr  (conj % trclerr)  %))
+      (update-in [:training :stats :val-cl-err] #(if valclerr (conj % valclerr) %))
       (update-in [:training :stats :epochs] inc))))
 
 ; Training on the whole training set
