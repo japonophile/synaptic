@@ -312,9 +312,9 @@
     (let [nn   (assoc @(neural-net [2 2] :binary-threshold (training :perceptron))
                       :weights [(m/matrix [[1 -1 -1][1 1 1]])])
           ts   (training-set [[2 0][0 1][2 1][4 1][1 2]] ["1" "1" "0" "0" "0"])
-          err1 (training-error nn ts)
+          err1 (training-error :misclassification nn ts)
           nn2  (train-batch nn (first (:batches ts)))
-          err2 (training-error nn2 ts)]
+          err2 (training-error :misclassification nn2 ts)]
       (is (= [0.8] err1))
       (is (= [0.4] err2)))))
 
@@ -324,7 +324,7 @@
     (let [nn    @(neural-net [2 1] :binary-threshold (training :perceptron))
           stats (training-stats nn)]
       (is (= Stats (type stats)))
-      (is (= [] (:tr-err stats) (:val-err stats)))))
+      (is (= {:misclassification []} (:tr-err stats) (:val-err stats)))))
   (testing "update-stats should compute the training error (and optionally the
            validation error) for the neural network and update the stats"
     (let [nn     (assoc @(neural-net [2 2] :binary-threshold (training :perceptron))
@@ -342,12 +342,22 @@
           nn3    (-> nn2 (train-batch (second (:batches trset)))
                          (update-stats trset))
           st3    (-> nn3 :training :stats)]
-      (is (= [0.8] (:tr-err st1)))
-      (is (= [1.0] (:val-err st1)))
-      (is (= [0.8 0.8] (:tr-err st2)))
-      (is (= [1.0 1.0] (:val-err st2)))
-      (is (= [0.8 0.8 0.6] (:tr-err st3)))
-      (is (= [1.0 1.0 1.0] (:val-err st3))))))
+      (is (= [0.8]         (-> st1 :tr-err :misclassification)))
+      (is (= [1.0]         (-> st1 :val-err :misclassification)))
+      (is (= [0.8 0.8]     (-> st2 :tr-err :misclassification)))
+      (is (= [1.0 1.0]     (-> st2 :val-err :misclassification)))
+      (is (= [0.8 0.8 0.6] (-> st3 :tr-err :misclassification)))
+      (is (= [1.0 1.0 1.0] (-> st3 :val-err :misclassification)))))
+  (testing "training-stats should initialize error vectors based on training params"
+    (let [nn    @(neural-net [2 1] :sigmoid
+                             (training :backprop
+                                       {:stats {:errorkinds
+                                                [:misclassification
+                                                 :cross-entropy-binary]}}))
+          stats (training-stats nn)]
+      (is (= Stats (type stats)))
+      (is (= {:misclassification [] :cross-entropy-binary []}
+             (:tr-err stats) (:val-err stats))))))
 
 (deftest test-train-network
   (let [net   (neural-net [3 2] :binary-threshold (training :perceptron))
@@ -363,11 +373,14 @@
             net4 @(train net trset 10)
             st4 (-> @net :training :stats)]
         (is (= Stats (type st2)))
-        (is (= 1 (count (:tr-err st2)) (count (:val-err st2))))
+        (is (= 1 (count (-> st2 :tr-err :misclassification))
+                 (count (-> st2 :val-err :misclassification))))
         (is (= Stats (type st3)))
-        (is (= 3 (count (:tr-err st3)) (count (:val-err st3))))
+        (is (= 3 (count (-> st3 :tr-err :misclassification))
+                 (count (-> st3 :val-err :misclassification))))
         (is (= Stats (type st4)))
-        (is (= 13 (count (:tr-err st4)) (count (:val-err st4))))))
+        (is (= 13 (count (-> st4 :tr-err :misclassification))
+                  (count (-> st4 :val-err :misclassification))))))
     (testing "stop-training should stop the training before maxit is reached"
       (let [net2 (train net trset 1000)
             _    (Thread/sleep 20)
@@ -549,10 +562,10 @@
         (is (= "class [D" (str (type gval))))
         (is (= (+ (* 30 21) (* k 31)) (alength ^doubles gval)))))
     (testing "train :lbfgs should reduce the error"
-      (let [[err1 _] (training-error @net ts)
+      (let [[err1 _] (training-error :cross-entropy-multivariate @net ts)
             w1       (:weights @net)
             net2     @(train net ts 1)
-            [err2 _] (training-error @net ts)
+            [err2 _] (training-error :cross-entropy-multivariate @net ts)
             w2       (:weights @net)]
         (is (not= w1 w2))
         (is (every? true? (map #(= (m/size %1) (m/size %2)) w1 w2)))
