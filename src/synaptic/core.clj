@@ -84,9 +84,12 @@
   "Softmax activation function.
   Returns e(z) / Sum[e(z)]."
   [zs]
-  (let [es   (m/exp zs)
+  (let [k    (m/ncols zs)
+        nzs  (m/- zs (m/* (m/matrix (mapv (partial apply max) (m/rows zs)))
+                          (m/ones 1 k)))
+        es   (m/exp nzs)
         sums (m/* (m/matrix (mapv (partial reduce +) es))
-                  (m/ones 1 (m/ncols es)))]
+                  (m/ones 1 k))]
     (m/div es sums)))
 
 (defn actfn-kind
@@ -563,6 +566,8 @@
 
 ; Cost functions
 
+(def ce-tiny 1e-30)
+
 (defn misclassification
   "Misclassification cost function (for a single sample).
   Returns 1 if the sample is misclassified, 0 otherwise."
@@ -579,7 +584,9 @@
   Note it only works for binary target."  
   [outputs targets]
   (reduce + (map (fn [o t]
-                   (- (if (= 1.0 (double t)) (Math/log o) (Math/log (- 1 o)))))
+                   (- (if (= 1.0 (double t))
+                        (Math/log (+ o ce-tiny))
+                        (Math/log (- (+ 1 ce-tiny) o)))))
                  outputs targets)))
 
 (defn cross-entropy-multivariate
@@ -587,7 +594,7 @@
   Note it only works for binary target."  
   [outputs targets]
   (reduce + (map (fn [o t]
-                   (- (if (= 1.0 (double t)) (Math/log o) 0)))
+                   (- (if (= 1.0 (double t)) (Math/log (+ o ce-tiny)) 0)))
                  outputs targets)))
 
 (defn costfn-kind
