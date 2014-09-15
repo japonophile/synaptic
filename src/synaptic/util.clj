@@ -150,7 +150,7 @@
   (let [uniquelabels (unique labels)
         lbcodes      (bincodes (count uniquelabels))
         lb2code      (zipmap uniquelabels lbcodes)]
-    [(vec (map lb2code labels)) uniquelabels]))
+    [(mapv lb2code labels) uniquelabels]))
 
 (defn frombinary
   "Decode a vector of 0 and 1 to the original label, based on a vector
@@ -158,7 +158,7 @@
   [uniquelabels encodedlabels]
   (let [lbcodes      (bincodes (count uniquelabels))
         code2lb      (zipmap lbcodes uniquelabels)]
-    (vec (map code2lb encodedlabels))))
+    (mapv code2lb encodedlabels)))
 
 ; Make clatrix matrices printable and readable in EDN format
 
@@ -177,19 +177,84 @@
 
 (def datadir "data/")
 
-(defn savedata
+(defn save-data
   "Save data in edn format to a given place with auto-generated name."
-  [dataname data]
-  (let [timestamp (System/currentTimeMillis)]
-    (binding [*out* (FileWriter. (str datadir dataname "." timestamp) true)]
+  [datakind data & [dataname]]
+  (let [ext (or dataname (System/currentTimeMillis))]
+    (binding [*out* (FileWriter. (str datadir datakind "." ext) false)]
       (prn data))
-    timestamp))
+    ext))
 
-(defn loaddata
+(defn load-data
   "Load data previously saved with savedata."
-  [dataname timestamp]
+  [datakind dataname]
   (binding [*data-readers* (merge *data-readers* {'clatrix.core/Matrix read-matrix})]
-    (read-string (slurp (str datadir dataname "." timestamp)))))
+    (read-string (slurp (str datadir datakind "." dataname)))))
+
+(defn file-list
+  "List files of a given kind."
+  [datakind]
+  (let [prefix (str datakind ".")]
+    (mapv #(apply str (drop (count prefix) %))
+          (filter #(.startsWith % prefix)
+                  (map #(.getName %) (file-seq (File. datadir)))))))
+
+; Load data in IDX format
+
+(defn read-samples-idx
+  "Read samples (images) from a file encoded in IDX format."
+  [fname]
+  (let [f    (File. fname)
+        dis  (DataInputStream. (FileInputStream. f))
+        mn   (.readInt dis)]
+    (assert (= mn 2051))
+    (let [nsmp (.readInt dis)
+          nrow (.readInt dis)
+          ncol (.readInt dis)
+          samples (vec (for [i (range nsmp)]
+                         (vec (for [j (range (* nrow ncol))]
+                                (int (bit-and 0xff (.readByte dis)))))))]
+      (.close dis)
+      samples)))
+
+(defn read-labels-idx
+  "Read labels from a file encoded in IDX format."
+  [fname]
+  (let [f    (File. fname)
+        dis  (DataInputStream. (FileInputStream. f))
+        mn   (.readInt dis)]
+    (assert (= mn 2049))
+    (let [nlb  (.readInt dis)
+          labels (vec (for [i (range nlb)]
+                        (int (bit-and 0xff (.readByte dis)))))]
+      (.close dis)
+      labels)))
+
+;(def smp (read-samples-idx "data/t10k-images-idx3-ubyte"))
+;(def lb  (read-labels-idx  "data/t10k-labels-idx1-ubyte"))
+;(def trset (training-set smp lb {:name "mnist10k" :type :grayscale-image :rand false :batch 500 :nvalid 2000}))
+;(save-training-set trset)
+
+; Load data in CSV format
+
+(defn read-labeledsamples-csv
+  "Read trainingset in CSV format"
+  [fname]
+  (with-open [r (clojure.java.io/reader fname)]
+    (loop [lines (rest (line-seq r)), samples [], labels []]
+      (let [line (first lines)
+            labeledsample (read-string (str "[" line "]"))
+            label (first labeledsample)
+            sample (vec (rest labeledsample))]
+        (if (next lines)
+          (recur (rest lines) (conj samples sample) (conj labels label))
+          [samples labels])))))
+
+;(def lbsmp (read-labeledsamples-csv "data/train.csv"))
+;(def smp (first lbsmp))
+;(def lb (second lbsmp))
+;(def trset (training-set smp lb {:name "MNIST-train" :type :grayscale-image :fieldsize [28 28] :rand false :batch 5000 :nvalid 5000}))
+;(save-training-set trset)
 
 ; Matrix utilities
 
@@ -235,37 +300,14 @@
   {:pre [(m/matrix? mat)]}
   (apply m/hstack (rest (m/cols mat))))
 
-(defn read-samples-idx
-  "Read samples (images) from a file encoded in IDX format."
-  [fname]
-  (let [f    (File. fname)
-        dis  (DataInputStream. (FileInputStream. f))
-        mn   (.readInt dis)]
-    (assert (= mn 2051))
-    (let [nsmp (.readInt dis)
-          nrow (.readInt dis)
-          ncol (.readInt dis)
-          samples (vec (for [i (range nsmp)]
-                         (vec (for [j (range (* nrow ncol))]
-                                (int (bit-and 0xff (.readByte dis)))))))]
-      (.close dis)
-      samples)))
+; Math utils
 
-(defn read-labels-idx
-  "Read labels from a file encoded in IDX format."
-  [fname]
-  (let [f    (File. fname)
-        dis  (DataInputStream. (FileInputStream. f))
-        mn   (.readInt dis)]
-    (assert (= mn 2049))
-    (let [nlb  (.readInt dis)
-          labels (vec (for [i (range nlb)]
-                        (int (bit-and 0xff (.readByte dis)))))]
-      (.close dis)
-      labels)))
-
-;(def smp (read-samples-idx "data/t10k-images-idx3-ubyte"))
-;(def lb  (read-labels-idx  "data/t10k-labels-idx1-ubyte"))
-;(def trset (training-set smp lb {:rand false :batch 500 :nvalid 2000}))
-;(savedata "trainingset" trset)
+(defn divisors
+  "Returns 2 divisors of n that give the biggest product"
+  [n]
+  (loop [d (int (Math/sqrt n))]
+    (cond
+      (= 0 d)         [n 1]
+      (= 0 (mod n d)) [(/ n d) d]
+      :else           (recur (dec d)))))
 

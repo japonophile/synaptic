@@ -126,8 +126,8 @@
                            ["b" "a" "a" "b" "a" "b" "b" "a" "b"] {:batch 2})]
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
-            vs   (:val-set ts)
-            ulbs (:uniquelabels ts)]
+            vs   (:valid ts)
+            ulbs (-> ts :header :labels)]
         (is (vector? bs))
         (is (= 5 (count bs)))
         (is (every? #(= DataSet (type %)) bs))
@@ -144,8 +144,8 @@
                            {:nvalid 3})]
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
-            vs   (:val-set ts)
-            ulbs (:uniquelabels ts)]
+            vs   (:valid ts)
+            ulbs (-> ts :header :labels)]
         (is (vector? bs))
         (is (= 1 (count bs)))
         (is (= DataSet (type (first bs))))
@@ -167,8 +167,8 @@
           ts  (training-set smp ["+" "-" "-" "+" "+"] {:online true :rand false})]
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
-            vs   (:val-set ts)
-            ulbs (:uniquelabels ts)]
+            vs   (:valid ts)
+            ulbs (-> ts :header :labels)]
         (is (vector? bs))
         (is (= 5 (count bs)))
         (is (= DataSet (type (first bs))))

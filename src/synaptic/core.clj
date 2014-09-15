@@ -128,6 +128,19 @@
          (or (keyword? actfn) (= (dec (count layers)) (count actfn)))]}
   (atom (Net. (Arch. layers actfn) (init-all-weights layers) training)))
 
+(defn save-neural-net
+  "Save neural network to disk.
+  The header is saved separately for quicker access."
+  [^Net nn]
+  (if-let [nnname (-> nn :header :name)]
+    (u/save-data "neuralnet" nn nnname)
+    (u/save-data "neuralnet" nn)))
+
+(defn load-neural-net
+  "Load a neural net from disk."
+  [nnname]
+  (u/load-data "neuralnet" nnname))
+
 ; Network outputs (neuron activities, forward pass)
 
 (defn activities
@@ -160,7 +173,7 @@
 ; Training set
 
 (defrecord DataSet [x y])
-(defrecord TrainingSet [batches val-set uniquelabels])
+(defrecord TrainingSet [header batches valid])
 
 (defn encode-sample
   "Encode a vector of 0 and 1 into a Base64 string."
@@ -175,10 +188,29 @@
 (defn load-labeled-samples
   "Load labeled samples from disk."
   [sname]
-  (let [lbsmp (u/loaddata "labeledsamples" sname)
+  (let [lbsmp (u/load-data "labeledsamples" sname)
         fsize (-> lbsmp :header :fieldsize)]
     (assoc lbsmp :samples
                  (mapv (partial decode-sample fsize) (:samples lbsmp)))))
+
+(defn save-training-set
+  "Save training set to disk.
+  The header is saved separately for quicker access."
+  [^TrainingSet trset]
+  (let [header  (:header trset)
+        tsname  (header :name)]
+    (u/save-data "trainingset-header" header tsname)
+    (u/save-data "trainingset"        trset  tsname)))
+
+(defn load-training-set-header
+  "Load a training set header from disk."
+  [tsname]
+  (u/load-data "trainingset-header" tsname))
+
+(defn load-training-set
+  "Load a training set from disk."
+  [tsname]
+  (u/load-data "trainingset" tsname))
 
 (defn shuffle-vecs
   "Randomly shuffle multiple vectors of same size in the same way."
@@ -209,14 +241,24 @@
     (DataSet. (apply m/vstack (map :x batches)) (apply m/vstack (map :y batches)))
     (first batches)))
 
+(defn count-labels
+  "Create a map with number of occurrence of each label."
+  [uniquelabels binlabels]
+  (let [binlb2cnt (reduce (fn [lbmap lb] (assoc lbmap lb (inc (get lbmap lb 0))))
+                          {} binlabels)]
+    (zipmap (u/frombinary uniquelabels (keys binlb2cnt)) (vals binlb2cnt))))
+
 (defn training-set
   "Create a training set from samples and associated labels.
   The training set consists of one or more batches and optionally a validation set.
   It also has a map that will allow converting y's back to the original labels.
   
   Options:
-    :nvalid size - size of the validation set (default is 0, i.e. no validation set)
-    :batch size  - size of a mini-batch (default is the number of samples, after
+    :name        - a name for the training set
+    :type        - the type of training data (e.g. :binary-image, :grayscale-image ...)
+    :fieldsize   - [width height] of each sample data (for images)
+    :nvalid      - size of the validation set (default is 0, i.e. no validation set)
+    :batch       - size of a mini-batch (default is the number of samples, after
                    having set apart the validation set)
     :online true - set this flag for online training (same as batch size = 1)
     :rand false  - unset this flag to keep original ordering (by default, samples
@@ -232,8 +274,17 @@
         [trainlb  validlb]  (if trainsize (split-at trainsize lb) [lb nil])
         [batchsmp batchlb]  (partition-vecs batchsize trainsmp trainlb)
         trainsets  (mapv dataset batchsmp batchlb)
-        validset   (if trainsize (dataset validsmp validlb))]
-    (TrainingSet. trainsets validset uniquelb)))
+        validset   (if trainsize (dataset validsmp validlb))
+        timestamp  (System/currentTimeMillis)
+        header     {:name (or (:name options) timestamp)
+                    :timestamp timestamp
+                    :type (:type options)
+                    :fieldsize (or (:fieldsize options)
+                                   (u/divisors (count (first samples))))
+                    :batches (mapv (partial count-labels uniquelb) batchlb)
+                    :valid (count-labels uniquelb validlb)
+                    :labels uniquelb}]
+    (TrainingSet. header trainsets validset)))
 
 ; Training
 
@@ -597,14 +648,18 @@
                    (- (if (= 1.0 (double t)) (Math/log (+ o ce-tiny)) 0)))
                  outputs targets)))
 
+(defn specific-error-kind
+  [^Net nn errorkind]
+  (if (= errorkind :cross-entropy)
+    (if (= (actfn-kind nn) :softmax)
+      :cross-entropy-multivariate
+      :cross-entropy-binary)
+    errorkind))
+
 (defn costfn-kind
   [^Net nn]
   (let [errorkind (-> nn :training :params :cost-fn)]
-    (if (= errorkind :cross-entropy)
-      (if (= (actfn-kind nn) :softmax)
-        :cross-entropy-multivariate
-        :cross-entropy-binary)
-      errorkind)))
+    (specific-error-kind nn errorkind)))
 
 (defmulti cost-fn
   "Returns the cost function for a network or expressed as a keyword"
@@ -674,7 +729,7 @@
   Kind of errors are: :misclassification, :sum-of-square, :cross-entropy."
   [errorkind ^Net nn ^TrainingSet trset]
   (let [trerr (training-error-datasets errorkind nn (:batches trset))]
-    (if-let [valds (:val-set trset)]
+    (if-let [valds (:valid trset)]
       (let [valerr (training-error-datasets errorkind nn [valds])]
         [trerr valerr])
       [trerr])))
@@ -685,7 +740,9 @@
   "Returns a vector of kinds of error to be computed as part of training stats.
   If not specified in training params, it defaults to the network cost function."
   [^Net nn]
-  (or (-> nn :training :params :stats :errorkinds) [(costfn-kind nn)]))
+  (if-let [errorkinds (-> nn :training :params :stats :errorkinds)]
+    (mapv (partial specific-error-kind nn) errorkinds)
+    [(costfn-kind nn)]))
 
 (defn training-stats
   "Create training statistics for a neural network.  Stats will be updated
