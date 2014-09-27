@@ -229,10 +229,12 @@
     (mapv vector vectors)))
 
 (defn dataset
-  "Create a dataset with x and y."
-  [x y]
-  {:pre [(= (count x) (count y))]}
-  (DataSet. (m/matrix x) (m/matrix y)))
+  "Create a dataset with x and (optionally) y."
+  ([x y]
+   {:pre [(= (count x) (count y))]}
+   (DataSet. (m/matrix x) (m/matrix y)))
+  ([x]
+   (DataSet. (m/matrix x) nil)))
 
 (defn merge-batches
   "Merge batches into a single dataset."
@@ -285,6 +287,27 @@
                     :valid (count-labels uniquelb validlb)
                     :labels uniquelb}]
     (TrainingSet. header trainsets validset)))
+
+(defn test-set
+  "Create a test set from samples.
+  The test set consists of a single batch.
+  
+  Options:
+    :name        - a name for the test set
+    :type        - the type of training data (e.g. :binary-image, :grayscale-image ...)
+    :fieldsize   - [width height] of each sample data (for images)
+    :rand true   - set this flag to shuffle samples."
+  [samples & [options]]
+  (let [randomize (if (nil? (:rand options)) false (:rand options))
+        testset   (dataset (if randomize (shuffle-vecs samples) samples))
+        timestamp (System/currentTimeMillis)
+        header    {:name (or (:name options) timestamp)
+                   :timestamp timestamp
+                   :type (:type options)
+                   :batches [{"?" (count samples)}]
+                   :fieldsize (or (:fieldsize options)
+                                  (u/divisors (count (first samples))))}]
+    (TrainingSet. header [testset] nil)))
 
 ; Training
 
@@ -849,4 +872,19 @@
   (if (= :training (-> @net :training :state :state))
     (swap! net assoc-in [:training :state :state] :stopping)))
 
+; Estimation
+
+(defn estimate
+  "Estimate classes for a given data set, by computing network output for each
+  sample of the data set, and returns the most probable class (label) - or its
+  index if labels are not defined."
+  [^Net nn ^DataSet dset]
+  (let [x  (:x dset)
+        y  (m/dense (last (net-activities nn x)))
+        n  (count (first y))
+        ci (mapv #(apply max-key % (range n)) y)
+        cs (-> nn :header :labels)]
+    (if cs
+      (mapv #(get cs %) ci)
+      ci)))
 

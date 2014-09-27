@@ -238,7 +238,7 @@
 ; Load data in CSV format
 
 (defn read-labeledsamples-csv
-  "Read trainingset in CSV format"
+  "Read labeled samples in CSV format"
   [fname]
   (with-open [r (clojure.java.io/reader fname)]
     (loop [lines (rest (line-seq r)), samples [], labels []]
@@ -250,11 +250,26 @@
           (recur (rest lines) (conj samples sample) (conj labels label))
           [samples labels])))))
 
+(defn read-samples-csv
+  "Read (unlabeled) samples in CSV format"
+  [fname]
+  (with-open [r (clojure.java.io/reader fname)]
+    (loop [lines (rest (line-seq r)), samples []]
+      (let [line (first lines)
+            sample (read-string (str "[" line "]"))]
+        (if (next lines)
+          (recur (rest lines) (conj samples sample))
+          samples)))))
+
 ;(def lbsmp (read-labeledsamples-csv "data/train.csv"))
 ;(def smp (first lbsmp))
 ;(def lb (second lbsmp))
 ;(def trset (training-set smp lb {:name "MNIST-train" :type :grayscale-image :fieldsize [28 28] :rand false :batch 5000 :nvalid 5000}))
 ;(save-training-set trset)
+
+;(def smp (read-samples-csv "data/test.csv"))
+;(def testset (test-set smp {:name "MNIST-test" :type :grayscale-image :fieldsize [28 28]}))
+;(save-training-set testset)
 
 ; Matrix utilities
 
