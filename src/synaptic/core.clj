@@ -318,7 +318,7 @@
 
   Training parameters:
   {
-    :cost-fn            :misclassification, :sum-of-squares, :cross-entropy
+    :error-fn           :misclassification, :sum-of-squares, :cross-entropy
     :learning-rate {    (required for :backprop and :rmsprop)
         :epsilon        learning rate (default: 0.01)
         :adaptive       true for adaptive learning rate
@@ -330,6 +330,10 @@
         :alpha-step     step to increase momentum factor (from alpha-start to alpha)
         :nesterov       true to use Nesterov's momentum method
       }
+    :regularization {
+        :lambda         regularization coefficient
+        :kind           :l1 or :l2
+    }
     :rprop {
         :mins / :maxs   min / max step size (reqd for rprop, default 1e-6 / 50.0)
     }
@@ -341,15 +345,15 @@
   {:pre [(#{:perceptron :backprop :rprop :rmsprop :lbfgs} algo)]}
   (let [default-params
         (case algo
-          :perceptron {:cost-fn :misclassification}
-          :backprop   {:cost-fn :cross-entropy
+          :perceptron {:error-fn :misclassification}
+          :backprop   {:error-fn :cross-entropy
                        :learning-rate {:epsilon 0.01}}
-          :rprop      {:cost-fn :cross-entropy
+          :rprop      {:error-fn :cross-entropy
                        :rprop {:mins 0.000001 :maxs 50.0}}
-          :rmsprop    {:cost-fn :cross-entropy
+          :rmsprop    {:error-fn :cross-entropy
                        :rmsprop {:alpha 0.9}
                        :learning-rate {:epsilon 0.01}}
-          :lbfgs      {:cost-fn :cross-entropy})]
+          :lbfgs      {:error-fn :cross-entropy})]
     (Training. algo (merge default-params params) {} nil)))
 
 ; Learning
@@ -407,7 +411,7 @@
   "Returns the function to compute the error derivative of the output layer
   of a neural network from the target value and actual output for a given sample."
   [^Net nn]
-  (case [(actfn-kind nn) (-> nn :training :params :cost-fn)]
+  (case [(actfn-kind nn) (-> nn :training :params :error-fn)]
     [:softmax :cross-entropy]  (fn [ts ys] (m/- ys ts))
     [:sigmoid :cross-entropy]  (fn [ts ys] (m/- ys ts))
     [:sigmoid :sum-of-squares] (fn [ts ys] (m/mult (m/mult ys (m/- 1.0 ys))
@@ -443,6 +447,59 @@
         dEdzs (error-derivatives-wrt-logit nn as y)
         dEdws (error-derivatives-wrt-weights dEdzs (cons x (butlast as)))]
     dEdws))
+
+; Regularization
+
+(defn norm-fn
+  "Returns the norm function (to be used for regularization)."
+  [normkind lambda]
+  (case normkind
+    :l1 (fn [w] (* 0.5 lambda (if (> 0.0 w) (- w) w)))
+    :l2 (fn [w] (* 0.5 lambda w w))
+    (fn [_] 0.0))) ; unknown
+
+(defn regularization-penalty
+  "Compute the regularization penalty for either L1 or L2 square norm
+  (multiplied by the regularization coefficient).
+  Note: the bias does not contribute to the penalty."
+  [reg weights]
+  (let [reg-fn (norm-fn (:kind reg) (:lambda reg))]
+    (reduce + (pmap (fn [ws]
+                      (reduce +
+                        (map reg-fn (flatten (u/without-bias ws))))) weights))))
+
+(defn deriv-norm-fn
+  "Returns the derivative of a norm function, expressed as a keyword
+  (to be used for regularization)."
+  [normkind lambda]
+  (case normkind
+    :l1 (fn [w] (if (> 0.0 w) (- lambda) lambda))
+    :l2 (fn [w] (* lambda w))
+    (fn [_] 0.0))) ; unknown
+
+(defn regularization-derivatives
+  "Compute the regularization term of the cost derivatives for either L1 or
+  L2 square norm (multiplied by the regularization coefficient).
+  Note: the bias is not regularized (corresponding term is always 0.0)."
+  [reg weights]
+  (let [reg-fn (deriv-norm-fn (:kind reg) (:lambda reg))]
+    (vec (pmap (fn [ws]
+                 (m/map-indexed (fn [i j w]
+                                  ; don't regularize the bias
+                                  (if (> j 0) (reg-fn w) 0.0)) ws))
+               weights))))
+
+(defn cost-derivatives
+  "Compute the derivatives of the cost function (including error and optionally
+  a regularization penaly) wrt each weight.  If there is no regularization term,
+  this is just error-derivatives."
+  [^Net nn ^DataSet dset]
+  (let [dEdws (error-derivatives nn dset)
+        reg   (-> nn :training :parameters :regularization)]
+    (if reg
+      (vec (pmap (fn [dEdw r] (m/+ dEdw r))
+                 dEdws (regularization-derivatives reg (:weights nn))))
+      dEdws)))
 
 ; - Weight update coefficients (learning rate / rprop step size)
 
@@ -591,8 +648,8 @@
   :backprop
   [^Net nn ^DataSet dset]
   (let [m       (first (m/size (:x dset)))
-        dEdws   (error-derivatives nn dset)
-        dw      (vec (pmap (partial m/* (/ -1.0 m)) dEdws))
+        dCdws   (cost-derivatives nn dset)
+        dw      (vec (pmap (partial m/* (/ -1.0 m)) dCdws))
         [nn dw] (apply-learning-rate nn dw)
         [nn dw] (apply-momentum nn dw)
         nn      (assoc-in nn [:training :state :deltaw] dw)]
@@ -602,9 +659,9 @@
   :nesterov
   [^Net nn ^DataSet dset]
   (let [[nn prev-dw] (apply-nesterov-momentum nn)
-        dEdws        (error-derivatives nn dset)
+        dCdws        (cost-derivatives nn dset)
         m            (first (m/size (:x dset)))
-        dw           (vec (pmap (partial m/* (/ -1.0 m)) dEdws))
+        dw           (vec (pmap (partial m/* (/ -1.0 m)) dCdws))
         [nn dw]      (apply-learning-rate nn dw)
         acc-dw       (vec (pmap m/+ prev-dw dw))
         nn           (assoc-in nn [:training :state :deltaw] acc-dw)]
@@ -613,8 +670,8 @@
 (defmethod deltaw
   :rprop
   [^Net nn ^DataSet dset]
-  (let [dEdws   (error-derivatives nn dset)
-        dw      (vec (pmap (partial m/* -1.0) dEdws))
+  (let [dCdws   (cost-derivatives nn dset)
+        dw      (vec (pmap (partial m/* -1.0) dCdws))
         [nn dw] (adjust-step-size nn dw)
         [nn dw] (apply-momentum nn dw)
         nn      (assoc-in nn [:training :state :deltaw] dw)]
@@ -623,8 +680,8 @@
 (defmethod deltaw
   :rmsprop
   [^Net nn ^DataSet dset]
-  (let [dEdws   (error-derivatives nn dset)
-        dw      (vec (pmap (partial m/* -1.0) dEdws))
+  (let [dCdws   (cost-derivatives nn dset)
+        dw      (vec (pmap (partial m/* -1.0) dCdws))
         [nn dw] (apply-rms-gradient nn dw)
         [nn dw] (apply-learning-rate nn dw)
         [nn dw] (apply-momentum nn dw)
@@ -643,18 +700,18 @@
 (def ce-tiny 1e-30)
 
 (defn misclassification
-  "Misclassification cost function (for a single sample).
+  "Misclassification error function (for a single sample).
   Returns 1 if the sample is misclassified, 0 otherwise."
   [outputs targets]
   (if (= outputs targets) 0 1))
 
 (defn sum-of-squares
-  "Sum of square cost function (for a single sample)."
+  "Sum of square error function (for a single sample)."
   [outputs targets]
   (reduce + (map (fn [o t] (Math/pow (- o t) 2)) outputs targets)))
 
 (defn cross-entropy-binary
-  "Binary cross-entropy cost function (for a single sample).
+  "Binary cross-entropy error function (for a single sample).
   Note it only works for binary target."  
   [outputs targets]
   (reduce + (map (fn [o t]
@@ -664,7 +721,7 @@
                  outputs targets)))
 
 (defn cross-entropy-multivariate
-  "Multivariate cross-entropy cost function (for a single sample).
+  "Multivariate cross-entropy error function (for a single sample).
   Note it only works for binary target."  
   [outputs targets]
   (reduce + (map (fn [o t]
@@ -679,24 +736,24 @@
       :cross-entropy-binary)
     errorkind))
 
-(defn costfn-kind
+(defn errorfn-kind
   [^Net nn]
-  (let [errorkind (-> nn :training :params :cost-fn)]
+  (let [errorkind (-> nn :training :params :error-fn)]
     (specific-error-kind nn errorkind)))
 
-(defmulti cost-fn
-  "Returns the cost function for a network or expressed as a keyword"
+(defmulti error-fn
+  "Returns the error function for a network or expressed as a keyword"
   (fn [arg] (type arg)))
 
-(defmethod cost-fn
+(defmethod error-fn
   clojure.lang.Keyword
   [errorkind]
   (resolve (symbol "synaptic.core" (name errorkind))))
 
-(defmethod cost-fn
+(defmethod error-fn
   Net
   [^Net nn]
-  (cost-fn (costfn-kind nn)))
+  (error-fn (errorfn-kind nn)))
 
 ; L-BFGS learning
 
@@ -725,8 +782,20 @@
         out   (last as)
         dEdzs (error-derivatives-wrt-logit nn as y)
         dEdws (error-derivatives-wrt-weights dEdzs (cons x (butlast as)))
-        E     (reduce + (map (cost-fn nn) (m/dense out) (m/dense y)))]
-    [(double E) (weights-to-double-array dEdws)]))
+        E     (reduce + (map (error-fn nn) (m/dense out) (m/dense y)))]
+    [(double E) dEdws]))
+
+(defn cost+derivatives
+  "Compute both the cost and the cost derivatives for a given dataset."
+  [^Net nn ^DataSet dset]
+  (let [[E dEdws] (error+derivatives nn dset)
+        weights   (:weights nn)
+        reg       (-> nn :training :parameters :regularization)]
+    (if reg
+      [(+ E (regularization-penalty reg weights))
+       (vec (pmap (fn [dEdw r] (m/+ dEdw r))
+                  dEdws (regularization-derivatives reg weights)))]
+      [E dEdws])))
 
 ; Training error
 
@@ -737,8 +806,8 @@
         as    (last (net-activities nn x))
         out   (if (= :misclassification errorkind)
                 (m/map (fn [^double a] (Math/round a)) as) as)
-        cost  (cost-fn errorkind)]
-    (reduce + (map cost (m/dense out) (m/dense y)))))
+        errfn (error-fn errorkind)]
+    (reduce + (map errfn (m/dense out) (m/dense y)))))
 
 (defn training-error-datasets
   "Compute a kind of training error of the network for multiple datasets."
@@ -761,11 +830,11 @@
 
 (defn error-kinds
   "Returns a vector of kinds of error to be computed as part of training stats.
-  If not specified in training params, it defaults to the network cost function."
+  If not specified in training params, it defaults to the network error function."
   [^Net nn]
   (if-let [errorkinds (-> nn :training :params :stats :errorkinds)]
     (mapv (partial specific-error-kind nn) errorkinds)
-    [(costfn-kind nn)]))
+    [(errorfn-kind nn)]))
 
 (defn training-stats
   "Create training statistics for a neural network.  Stats will be updated
@@ -816,14 +885,15 @@
   (future
     (swap! net assoc-in [:training :state :state] :training)
     (swap! net init-stats)
-    (let [l  (-> @net :arch :layers)
-          b  (merge-batches (:batches trset))
-          w0 (weights-to-double-array (:weights @net))
-          wt (b/lbfgs (fn [^doubles w]
-                        (swap! net assoc :weights (double-array-to-weights w l))
-                        (swap! net update-stats trset)
-                        (error+derivatives @net b))
-                      w0 {:eps 0.1 :maxit nepochs})]
+    (let [l         (-> @net :arch :layers)
+          b         (merge-batches (:batches trset))
+          w0        (weights-to-double-array (:weights @net))
+          [C dCdws] (cost+derivatives @net b)
+          wt        (b/lbfgs (fn [^doubles w]
+                               (swap! net assoc :weights (double-array-to-weights w l))
+                               (swap! net update-stats trset)
+                               [C (weights-to-double-array dCdws)])
+                             w0 {:eps 0.1 :maxit nepochs})]
       (swap! net assoc :weights (double-array-to-weights wt l))
       (swap! net update-stats trset))
     (swap! net assoc-in [:training :state :state] nil)

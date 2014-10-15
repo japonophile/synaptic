@@ -410,7 +410,7 @@
                            [ 0.42621045  0.231439954  0.19477050]]
                           (nth dw 1))))))
 
-(deftest test-cost-functions
+(deftest test-error-functions
   (testing "misclassification should return 1 if the sample is misclassified"
     (is (= 1 (misclassification [1 0 1 0 1] [1 0 0 0 1])))
     (is (= 0 (misclassification [0 1 0 1 0] [0 1 0 1 0]))))
@@ -424,20 +424,20 @@
                       (cross-entropy-multivariate [0.9 0.1 0.9 0.1] [1 0 1 0])))
     (is (quasi-equal? 0.10536052 (cross-entropy-binary [0.9] [1])))
     (is (quasi-equal? 2.30258509 (cross-entropy-binary [0.9] [0]))))
-  (testing "cost-fn should return the cost function for a network or keyword"
+  (testing "error-fn should return the error function for a network or keyword"
     (let [nn1 @(neural-net [3 2] :binary-threshold (training :perceptron))
           nn2 @(neural-net [3 2] :sigmoid (training :backprop))
           nn3 @(neural-net [3 2] :softmax (training :backprop))
           nn4 @(neural-net [3 2] :sigmoid (training :backprop
-                                                   {:cost-fn :sum-of-squares}))]
-      (is (= #'misclassification (cost-fn nn1)))
-      (is (= #'misclassification (cost-fn :misclassification)))
-      (is (= #'cross-entropy-binary (cost-fn nn2)))
-      (is (= #'cross-entropy-binary (cost-fn :cross-entropy-binary)))
-      (is (= #'cross-entropy-multivariate (cost-fn nn3)))
-      (is (= #'cross-entropy-multivariate (cost-fn :cross-entropy-multivariate)))
-      (is (= #'sum-of-squares (cost-fn nn4)))
-      (is (= #'sum-of-squares (cost-fn :sum-of-squares))))))
+                                                   {:error-fn :sum-of-squares}))]
+      (is (= #'misclassification (error-fn nn1)))
+      (is (= #'misclassification (error-fn :misclassification)))
+      (is (= #'cross-entropy-binary (error-fn nn2)))
+      (is (= #'cross-entropy-binary (error-fn :cross-entropy-binary)))
+      (is (= #'cross-entropy-multivariate (error-fn nn3)))
+      (is (= #'cross-entropy-multivariate (error-fn :cross-entropy-multivariate)))
+      (is (= #'sum-of-squares (error-fn nn4)))
+      (is (= #'sum-of-squares (error-fn :sum-of-squares))))))
 
 (deftest test-adaptive-learning-rate
   (let [dw  (m/matrix [[1 -1 1][-1 -1 1]])
@@ -484,9 +484,12 @@
         (is (m-quasi-equal? [[1.2 -0.25 0.1][-10.0 -1.14 0.6]] dw2))))
     (testing "deltaw should adjust step size and compute deltaw"
       (let [pdw (m/matrix [[1 1 -1][1 1 -1]])
-            nn (assoc-in @(neural-net [2 2] :sigmoid
+            nn (assoc (assoc-in @(neural-net [2 2] :sigmoid
                           (training :rprop {:rprop {:mins 0.1 :maxs 10.0}}))
                          [:training :state] {:deltaw [pdw] :rp-step [ss]})
+                         :weights [(m/matrix
+                           [[ 0.0023498  0.0013089 -0.0085562]
+                            [-0.0013064 -0.0131069  0.0112939]])])
             ds (DataSet. (m/matrix [[1 0][0 0][0 1][1 1]])
                          (m/matrix [[0 1][1 1][1 0][0 0]]))
             ;dw sign will be [[1 -1 1][1 1 -1]]
@@ -559,8 +562,9 @@
     (testing "error+derivatives should produce a function to compute errors and deriv"
       (let [[fval gval] (error+derivatives @net (first (:batches ts)))]
         (is (= java.lang.Double (type fval)))
-        (is (= "class [D" (str (type gval))))
-        (is (= (+ (* 30 21) (* k 31)) (alength ^doubles gval)))))
+        (is (= 2 (count gval)))
+        (is (= [30 21] (m/size (nth gval 0))))
+        (is (= [k 31]  (m/size (nth gval 1))))))
     (testing "train :lbfgs should reduce the error"
       (let [[err1 _] (training-error :cross-entropy-multivariate @net ts)
             w1       (:weights @net)
@@ -570,4 +574,24 @@
         (is (not= w1 w2))
         (is (every? true? (map #(= (m/size %1) (m/size %2)) w1 w2)))
         (is (< err2 err1))))))
+
+(deftest test-regularization
+  (let [weights    [(m/matrix [[1 -2 3][-4 5 -6]]) (m/matrix [[7 8 -9]])]
+        reg1       {:lambda 0.05 :kind :l1}
+        reg2       {:lambda 0.01 :kind :l2}
+        reg3       {:lambda 0.01 :kind :unknown}]
+    (testing "regularization penalty should compute L1 or L2 squared norm"
+      (is (= (* 0.025  33) (regularization-penalty reg1 weights)))
+      (is (= (* 0.005 219) (regularization-penalty reg2 weights)))
+      (is (= 0.0           (regularization-penalty reg3 weights))))
+    (testing "regularization-derivatives should compute L1 or L2 squared norm deriv"
+      (let [reg-deriv1 (regularization-derivatives reg1 weights)
+            reg-deriv2 (regularization-derivatives reg2 weights)
+            reg-deriv3 (regularization-derivatives reg3 weights)]
+        (is (m-quasi-equal? [[0.0 -0.05 0.05] [0.0 0.05 -0.05]] (nth reg-deriv1 0)))
+        (is (m-quasi-equal? [[0.0 0.05 -0.05]] (nth reg-deriv1 1)))
+        (is (m-quasi-equal? [[0.0 -0.02 0.03] [0.0 0.05 -0.06]] (nth reg-deriv2 0)))
+        (is (m-quasi-equal? [[0.0 0.08 -0.09]] (nth reg-deriv2 1)))
+        (is (m-quasi-equal? [[0.0 0.0 0.0] [0.0 0.0 0.0]] (nth reg-deriv3 0)))
+        (is (m-quasi-equal? [[0.0 0.0 0.0]] (nth reg-deriv3 1)))))))
 
