@@ -326,3 +326,24 @@
       (= 0 (mod n d)) [(/ n d) d]
       :else           (recur (dec d)))))
 
+; Stat utils
+
+(defrecord Histogram [labels data])
+
+(defn histogram
+  "Create a histogram of the data."
+  ([samples nbins]
+    (let [lo (apply min samples)
+          hi (apply max samples)
+          df (if (< lo hi) (double (/ (- hi lo) nbins)) 1.0)
+          lb (mapv #(+ (* % df) lo (* df 0.5)) (range nbins))]
+      (loop [samples samples
+             hist    (apply vector (repeat nbins 0))]
+        (if (seq samples)
+          (let [i (min (dec nbins) (int (/ (- (first samples) lo) df)))
+                h (nth hist i)]
+            (recur (next samples) (assoc hist i (inc h))))
+          (Histogram. lb hist)))))
+  ([samples]
+    (histogram samples 20)))
+

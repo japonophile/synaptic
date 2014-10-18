@@ -37,12 +37,12 @@
 
 (deftest test-weight-initialization
   (testing "init-all-weights"
-    (let [w  (init-all-weights [5 3 2])]
+    (let [w (init-all-weights [5 3 2])]
       (is (vector? w))
       (is (= 2 (count w)))
       (let [w1 (first w)
             w2 (second w)]
-        (is (mat-of-size? w1  3 6))
+        (is (mat-of-size? w1 3 6))
         (is (mat-of-size? w2 2 4))
         (let [elems1 (apply concat (m/dense w1))
               elems2 (apply concat (m/dense w2))
@@ -50,10 +50,10 @@
               max1 (apply max elems1)
               min2 (apply min elems2)
               max2 (apply max elems2)]
-          (is (< 0 max1 (* 100 init-eps)))
-          (is (> 0 min1 (- (* 100 init-eps))))
-          (is (< 0 max2 (* 100 init-eps)))
-          (is (> 0 min2 (- (* 100 init-eps)))))))
+          (is (< 0 max1 (* 100 0.2)))
+          (is (> 0 min1 (- (* 100 0.2))))
+          (is (< 0 max2 (* 100 0.3)))
+          (is (> 0 min2 (- (* 100 0.3)))))))
     (is (thrown? java.lang.AssertionError (init-all-weights [])))
     (is (thrown? java.lang.AssertionError (init-all-weights [5])))))
 

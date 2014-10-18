@@ -17,24 +17,37 @@
 (defrecord Training [algo params state stats])
 (defrecord Net [arch weights training])
 
-;  Weight initialization
+; Network architecture
 
-(def init-eps 0.01)
+(defn layer-units
+  "Returns the number of units in a given layer of the neural network,
+  based on the net architecture (note: layer 0 is the input layer)."
+  [layers l]
+  {:pre [(<= 0 l (dec (count layers)))]}
+  (nth layers l))
+
+; Weight initialization
 
 (defn init-weights
   "Initialize weights of a single layer, comprising nout units,
   each with nin inputs."
   [nin nout]
+  {:pre [(> nin 0)]}
   (m/matrix (for [i (range nout)]
               (for [j (range (inc nin))]
-                (* init-eps (u/nrand))))))
+                (* (/ 1.0 nin) (u/nrand))))))
 
 (defn init-all-weights
   "Initialize weights of all layers."
   [layers]
   {:pre [(< 1 (count layers))]}
   (vec (for [i (range (dec (count layers)))]
-         (init-weights (nth layers i) (nth layers (inc i))))))
+         (init-weights (layer-units layers i) (layer-units layers (inc i))))))
+
+(defn weight-histograms
+  "Compute histograms of each layer's weights (excluding bias)."
+  [weights & [nbins]]
+  (vec (pmap #(u/histogram (flatten (u/without-bias %)) (or nbins 20)) weights)))
 
 ; Activation functions
 
@@ -145,7 +158,7 @@
 
 (defn activities
   "Compute activities of a layer of neurons, with the specified activation
-  function act-fn, given the layer weights w and layer inputs x."
+  function actfn, given the layer weights w and layer inputs x."
   [actfn w x]
   {:pre [(m/matrix? w) (m/matrix? x)
          (= (second (m/size w)) (inc (second (m/size x))))]}
@@ -695,7 +708,7 @@
   (let [[nn dw] (deltaw nn dset)]
     (assoc nn :weights (update-weights (:weights nn) dw))))
 
-; Cost functions
+; Error functions
 
 (def ce-tiny 1e-30)
 
@@ -768,8 +781,8 @@
   (vec (loop [i 0, ds (vec d), ws []]
          (if (empty? ds)
            ws
-           (let [r (nth layers (inc i))
-                 c (inc (nth layers i))
+           (let [r (layer-units layers (inc i))
+                 c (inc (layer-units layers i))
                  n (* r c)
                  w (m/matrix (partition c (take n ds)))]
              (recur (inc i) (drop n ds) (conj ws w)))))))
