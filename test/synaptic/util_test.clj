@@ -137,3 +137,13 @@
                              (m/matrix [[1.0 2.0 3.1] [4.0 5.0 6.0]]))))
     (is (m-quasi-equal? [[1.0 2.0 3.0999991][4.0 5.0 6.0]]
                         (m/matrix [[1.0 2.0 3.1] [4.0 5.0 6.0]])))))
+
+(deftest test-stat-utilities
+  (testing "histogram"
+    (is (= [1]           (:data (histogram [1] 1))))
+    (is (= [1 2 1]       (:data (histogram [1 2 2 3] 3))))
+    (is (= [1 0 2 3 4 1]
+           (:data (histogram [-1.6 3.0 1.91 0.9 1.1 1.9 2.1 2.95 3.1 2.9 4.1] 6))))
+    (is (= [1 0 0 0 0 0 0 0 0 0
+            0 0 0 0 0 0 0 0 0 1] (:data (histogram [1 2]))))))
+
