@@ -3,7 +3,8 @@
     :author "Antoine Choppin"}
   synaptic.util
   (:require [clatrix.core :as m])
-  (:import [java.io DataInputStream File FileInputStream FileWriter]))
+  (:import [java.io DataInputStream File FileInputStream FileWriter]
+           [org.jblas DoubleMatrix]))
 
 
 ; Random numbers

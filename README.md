@@ -19,6 +19,8 @@ using various algorithms such as:
 - L-BFGS (approximation of Newton's method)
 - R-prop
 - RMSprop
+- L1 & L2 regularization
+- convolution / pooling layers (initial implementation)
 
 It also allows to play with various training parameters like learning
 rate and momentum, and supports adaptive learning rate and variants of
@@ -104,7 +106,7 @@ or when training state or training stats are updated (typically every epoch).
 
 ## To Do
 
-- Implement regularization techniques, such as weight decay
+- Implement other regularization techniques, such as weight decay
 
 - Support other kind of neural networks, such as RNN or RBM
 
@@ -115,7 +117,7 @@ Your feedback on how it can be improved, and contributions are welcome.
 
 ## License
 
-Copyright © 2014 Antoine Choppin
+Copyright © 2014-2015 Antoine Choppin
 
 Distributed under the Eclipse Public License, the same as Clojure.
 
