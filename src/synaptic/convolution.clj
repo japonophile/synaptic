@@ -58,7 +58,7 @@
   there will be kin arrays of indices per patch (instead of just 1)."
   [kin win hin w h & [order]]
   (let [fsizein (* win hin)
-        indices (if (= :reversed order) (reverse (range fsizein)) (range fsizein))]
+        indices (range fsizein)]
     (loop [indices indices, conv-indices []]
       (if (< (count indices) (+ w (* (dec h) win)))
         conv-indices
@@ -93,23 +93,23 @@
   corresponding to a single sample.  So padding will in fact insert columns of 
   zeros not only at the left and right of the matrix, but also in the middle 
   (in between each row of the 2D matrices)."
-  [x w h wout hout]
-  {:post [(= (second (m/size %)) (* wout hout (/ (second (m/size x)) (* w h))))
+  [x win hin wpad hpad]
+  {:post [(= (second (m/size %)) (* wpad hpad (/ (second (m/size x)) (* win hin))))
           (= (first (m/size x)) (first (m/size %)))]}
   (let [n          (first (m/size x))
-        k          (/ (second (m/size x)) (* w h))
-        half-wpad  (/ (- wout w) 2)
-        half-hpad  (/ (- hout h) 2)
-        pad-updown (m/zeros n (+ (* half-hpad wout) half-wpad))
+        k          (/ (second (m/size x)) (* win hin))
+        half-wpad  (/ (- wpad win) 2)
+        half-hpad  (/ (- hpad hin) 2)
+        pad-updown (m/zeros n (+ (* half-hpad wpad) half-wpad))
         pad-sides  (m/zeros n (* 2 half-wpad))]
     (apply m/hstack
       (apply concat
-        (for [fmap-cols (partition (* w h) (m/cols x))]
+        (for [fmap-cols (partition (* win hin) (m/cols x))]
           (concat
             [pad-updown]
             (apply concat
-              (map vector (map (partial apply m/hstack) (partition w fmap-cols))
-                          (conj (vec (repeat (dec h) pad-sides)) (m/zeros n 0))))
+              (map vector (map (partial apply m/hstack) (partition win fmap-cols))
+                          (conj (vec (repeat (dec hin) pad-sides)) (m/zeros n 0))))
             [pad-updown]))))))
 
 (defn convolute
@@ -122,6 +122,17 @@
           (for [indices conv-indices]
             (let [as-with-bias (apply m/hstack (m/ones n) (m/cols a indices))]
               (m/cols (m/* as-with-bias (m/t b))))))))))
+
+(defn convolute-no-bias
+  "Perform convolution of b onto a, given pre-computed convolution indices."
+  [a b-no-bias conv-indices]
+  (let [n (first (m/size a))]
+    (apply m/hstack   ; create a big matrix with all columns
+      (apply concat   ; concat columns of all fieldmaps
+        (apply (partial map vector) ; group columns of same fieldmap
+          (for [indices conv-indices]
+            (let [as (apply m/hstack (m/cols a indices))]
+              (m/cols (m/* as (m/t b-no-bias))))))))))
 
 (defn sum-convolutions
   "Perform convolution of dEdw onto x, given pre-computed convolution indices,
@@ -152,19 +163,19 @@
   "Return indices of a single data sample corresponding to the max elements."
   [sample pool-kind pool-indices]
   (if (= :max pool-kind) ; currently only support max
-    ;(mapv #(apply max-key sample %) pool-indices)))
-    (mapv (fn [is]
-            (let [i  (apply max-key sample is)
-                  m  (nth sample i)
-                  vs (filter (fn [s]
-                               (> 0.00001 (Math/abs ^double (double (- s m)))))
-                             (map sample is))
-                  n  (count vs)]
-              (if (> n 1)
-                (do
-                  (printf "more than 1 (%d) max value %f\n" n m)
-                  (prn vs)))
-              i)) pool-indices)))
+    (mapv #(apply max-key sample %) pool-indices)))
+    ;(mapv (fn [is]
+    ;        (let [i  (apply max-key sample is)
+    ;              m  (nth sample i)
+    ;              vs (filter (fn [s]
+    ;                           (> 0.00001 (Math/abs ^double (double (- s m)))))
+    ;                         (map sample is))
+    ;              n  (count vs)]
+    ;          (if (> n 1)
+    ;            (do
+    ;              (printf "more than 1 (%d) max value %f\n" n m)
+    ;              (prn vs)))
+    ;          i)) pool-indices)))
 
 (defn select-row-elements-by-index
   "Select elements of each row of 'a' corresponding to the indices specified by 'i'."
@@ -216,6 +227,7 @@
 ; Training
 
 (defn convolution-layer-dimensions
+  "Returns (k,w,h) input, output and weights of a convolution layer."
   [layers l]
   {:pre [(= :convolution (:type (nth layers l))) (> l 0)]}
   (let [[kin win hin]   (:fieldsize (nth layers (dec l)))
@@ -227,16 +239,33 @@
                           fieldsize)]
     [kin win hin k wout hout w h]))
 
+(defn reverse-weights-no-bias
+  "Rearrange the convolution weights matrix, throwing away the bias column, and:
+  - reversing the matrix elements (correspond to flip in both x and y directions)
+  - arrange the weights patches in kin x (k * whb) instead of k x (kin * whb), 
+    where whb stands for wb * hb = the number of weights of a single patch."
+  [b k]
+  (let [whb         (quot (dec (second (m/size b))) k)
+        grp-of-cols (partition whb (rest (m/cols b)))
+        rows-of-ws  (map #(apply m/hstack (m/rows (apply m/hstack (reverse %))))
+                         grp-of-cols)
+        reversed-ws (apply m/vstack rows-of-ws)]
+    reversed-ws))
+
 (defmethod prev-layer-error-deriv-wrt-logit
   :convolution
   [layers l dEdz-out ay weights]
   (let [y               (:a ay)
         [kin win hin k wout hout w h] (convolution-layer-dimensions layers l)
-        dEdz-out-padded (pad-four-sides dEdz-out wout hout win hin)
-        conv-indices    (convolution-indices k win hin w h :reversed)
-        dEdy            (convolute dEdz-out (u/without-bias weights) conv-indices)
-        dydz            ((deriv-actfn (layer-actfn-kind layers (dec l))) y)
-        dEdz            (m/mult dEdy dydz)]
+        [wpad hpad]      [(+ win (dec w)) (+ hin (dec h))]
+        dEdz-out-padded  (pad-four-sides dEdz-out wout hout wpad hpad)
+        conv-indices     (convolution-indices k wpad hpad w h)
+        weights-cols     (m/cols weights)
+        reversed-weights (reverse-weights-no-bias weights kin)
+        dEdy             (convolute-no-bias dEdz-out-padded
+                                            reversed-weights conv-indices)
+        dydz             ((deriv-actfn (layer-actfn-kind layers (dec l))) y)
+        dEdz             (m/mult dEdy dydz)]
     dEdz))
 
 (defmethod layer-error-deriv-wrt-weights

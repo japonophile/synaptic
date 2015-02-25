@@ -21,11 +21,7 @@
       (is (= (count conv-indices) 400))   ; (28 - (9-1)) * (28 - (9-1)) = 20 * 20
       (is (every? #(= 243 (count %)) conv-indices))   ; 3 * 9 * 9 = 243
       (is (every? #(= (nth % 162) (+ 784 (nth % 81))
-                      (+ 784 784 (nth % 0))) conv-indices)))
-    (let [conv-indices (convolution-indices 1 12 10 5 3 :reversed)]
-      (is (= (count conv-indices) 64))   ; (12 - (5-1)) * (10 - (3-1)) = 8 * 8
-      (is (every? #(= 15 (count %)) conv-indices))   ; 5 * 3 = 15
-      (is (every? #(> (nth % 0) (nth % 1)) conv-indices))))
+                      (+ 784 784 (nth % 0))) conv-indices))))
   (testing "pad-four-sides"
     (is (= [[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
              0.0 0.0 1.0 2.0 3.0 4.0 0.0 0.0
@@ -206,7 +202,24 @@
           dEdws-approx (gradient-approx nn ds)]
       (is (= [[2 76] [1 33]] (mapv m/size (:weights nn))))
       (is (= [[2 76] [1 33]] (mapv m/size dEdws)))
-      (is (= (count dEdws) (count dEdws-approx)))
+      (is (= (count dEdws) (count dEdws-approx) 2))
+      (is (close-enough? dEdws dEdws-approx))))
+  (testing "error backpropagation with convolution layer: gradient checking"
+    (let [_  (rand-set! 1)
+          nn @(neural-net [{:type :input :fieldsize [3 10 10]}
+                           {:type :convolution :feature-map {:size [5 5] :k 2}
+                            :act-fn :hyperbolic-tangent}
+                           {:type :convolution :feature-map {:size [3 3] :k 1}
+                            :act-fn :hyperbolic-tangent}
+                           {:type :fully-connected :n 1 :act-fn :sigmoid}]
+                          (training :backprop))
+          ds (DataSet. (m/rand 10 (* 3 10 10))
+                       (m/matrix (map #(if (> % 0.5) 1.0 0.0) (m/rand 10 1))))
+          dEdws        (error-derivatives nn ds)
+          dEdws-approx (gradient-approx nn ds)]
+      (is (= [[2 76] [1 19] [1 17]] (mapv m/size (:weights nn))))
+      (is (= [[2 76] [1 19] [1 17]] (mapv m/size dEdws)))
+      (is (= (count dEdws) (count dEdws-approx) 3))
       (is (close-enough? dEdws dEdws-approx))))
   (testing "error-derivatives with pooling convolution layer: gradient checking"
     (let [_  (rand-set! 1) ; this is not doing anything right now, because using
@@ -224,6 +237,6 @@
           dEdws-approx (gradient-approx nn ds)]
       (is (= [[2 76] [1 9]] (mapv m/size (:weights nn))))
       (is (= [[2 76] [1 9]] (mapv m/size dEdws)))
-      (is (= (count dEdws) (count dEdws-approx)))
+      (is (= (count dEdws) (count dEdws-approx) 2))
       (is (close-enough? dEdws dEdws-approx)))))
 

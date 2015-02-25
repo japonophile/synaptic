@@ -140,7 +140,7 @@
     (loop [l last-layer-l, ws ws, ys (butlast ys), dEdzs [dEdz-out]]
       (if (> l 1)
         (let [dEdz (prev-layer-error-deriv-wrt-logit
-                     layers l (last dEdzs) (last ys) (last ws))]
+                     layers l (first dEdzs) (last ys) (last ws))]
           (recur (dec l) (butlast ws) (butlast ys) (cons dEdz dEdzs)))
         (vec dEdzs)))))
 
