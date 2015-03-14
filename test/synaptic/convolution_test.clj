@@ -11,64 +11,6 @@
             [org.jblas DoubleMatrix]))
 
 
-(deftest test-convolution
-  (testing "convolution-indices"
-    (let [conv-indices (convolution-indices 1 12 10 5 3)]
-      (is (= (count conv-indices) 64))   ; (12 - (5-1)) * (10 - (3-1)) = 8 * 8
-      (is (every? #(= 15 (count %)) conv-indices))   ; 5 * 3 = 15
-      (is (every? #(< (nth % 0) (nth % 1)) conv-indices)))
-    (let [conv-indices (convolution-indices 3 28 28 9 9)]
-      (is (= (count conv-indices) 400))   ; (28 - (9-1)) * (28 - (9-1)) = 20 * 20
-      (is (every? #(= 243 (count %)) conv-indices))   ; 3 * 9 * 9 = 243
-      (is (every? #(= (nth % 162) (+ 784 (nth % 81))
-                      (+ 784 784 (nth % 0))) conv-indices))))
-  (testing "pad-four-sides"
-    (is (= [[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
-             0.0 0.0 1.0 2.0 3.0 4.0 0.0 0.0
-             0.0 0.0 5.0 6.0 7.0 8.0 0.0 0.0
-             0.0 0.0 1.0 2.0 3.0 4.0 0.0 0.0
-             0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0]
-            [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
-             0.0 0.0 8.0 7.0 6.0 5.0 0.0 0.0
-             0.0 0.0 4.0 3.0 2.0 1.0 0.0 0.0
-             0.0 0.0 8.0 7.0 6.0 5.0 0.0 0.0
-             0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0]
-            [0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
-             0.0 0.0 1.0 2.0 3.0 4.0 0.0 0.0
-             0.0 0.0 4.0 3.0 2.0 1.0 0.0 0.0
-             0.0 0.0 5.0 6.0 7.0 8.0 0.0 0.0
-             0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0]]
-           (m/dense
-             (pad-four-sides
-               (m/matrix [[1 2 3 4  5 6 7 8  1 2 3 4]
-                          [8 7 6 5  4 3 2 1  8 7 6 5]
-                          [1 2 3 4  4 3 2 1  5 6 7 8]])
-               4 3 8 5))))))
-
-(deftest test-pooling
-  (testing "pooling-indices"
-    (is (= [[0 1 4 5 8 9] [2 3 6 7 10 11] [12 13 16 17 20 21] [14 15 18 19 22 23]]
-           (pooling-indices 1 4 6 2 3)))
-    (is (= [[ 0  1  4  5  8  9] [ 2  3  6  7 10 11]
-            [12 13 16 17 20 21] [14 15 18 19 22 23]
-            [24 25 28 29 32 33] [26 27 30 31 34 35]
-            [36 37 40 41 44 45] [38 39 42 43 46 47]
-            [48 49 52 53 56 57] [50 51 54 55 58 59]
-            [60 61 64 65 68 69] [62 63 66 67 70 71]]
-           (pooling-indices 3 4 6 2 3))))
-  (testing "pooling-activities-and-indices"
-    (let [x (m/matrix [[3 4 4 0  4 1 1 1  0 2 0 0   4 3 2 0  3 4 1 1  3 4 2 0]
-                       [0 0 0 2  3 3 1 0  0 3 0 1   4 0 2 2  3 1 0 0  4 2 1 0]
-                       [3 4 2 0  3 2 2 3  0 2 3 4   1 1 1 0  1 3 0 0  1 0 2 3]
-                       [3 3 2 1  1 0 1 3  2 1 0 3   4 3 0 2  2 4 3 0  3 3 3 4]])
-          pool-indices1 (pooling-indices 1 4 6 2 3)
-          pooling-result (pooling-activities-and-indices x :max pool-indices1)]
-      (is (= [[4.0 4.0 4.0 2.0]
-              [3.0 2.0 4.0 2.0]
-              [4.0 4.0 3.0 3.0]
-              [3.0 3.0 4.0 4.0]]
-             (m/dense (:a pooling-result)))))))
-
 (deftest test-weight-initialization
   (testing "init-all-weights for convolution layers"
     (let [layers (instrument-layers
@@ -136,11 +78,11 @@
               [4.0 6.0 2.0]]
              (m/dense (:a act-pool))))
       ; note: when the max value is found multiple times, the index of the max
-      ;       is the index of the *last* occurrence of that max value.
-      (is (= [[2.0 11.0 21.0]
-              [8.0 17.0 26.0]
-              [1.0 10.0 22.0]
-              [5.0 14.0 25.0]]
+      ;       is the index of the *first* occurrence of that max value.
+      (is (= [[2.0 11.0 19.0]
+              [0.0 16.0 21.0]
+              [1.0 10.0 18.0]
+              [5.0 14.0 20.0]]
              (m/dense (:i act-pool)))))))
 
 (defn close-enough?

@@ -5,6 +5,7 @@
   (:require [clatrix.core :as m]
             [synaptic.net :as n]
             [synaptic.mlp :as mlp]
+            [synaptic.convolution :as c]
             [synaptic.datasets :as d]
             [synaptic.training :as t]
             [synaptic.util :as u])

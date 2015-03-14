@@ -378,9 +378,9 @@
 (deftest test-weights-double-array
   (testing "it should be possible to convert weights to a double-array and vice versa"
     (let [nn @(mlp [20 30 10] :sigmoid)
-          ds (weights-to-double-array (:weights nn))]
+          ^doubles ds (weights-to-double-array (:weights nn))]
       (is (= "class [D" (str (type ds))))
-      (is (= (+ (* 30 21) (* 10 31)) (alength ^doubles ds)))
+      (is (= (+ (* 30 21) (* 10 31)) (alength ds)))
       (is (= (:weights nn) (double-array-to-weights ds (-> nn :arch :layers)))))))
 
 (deftest test-lbfgs
@@ -389,9 +389,9 @@
         net (mlp [20 30 k] [:sigmoid :softmax] (training :lbfgs))
         ts (training-set
              (vec (map vec (partition 20
-               (for [i (range 500)] (Math/round ^double (rand))))))
+               (for [i (range 500)] (Math/round (double (rand)))))))
              (vec (concat lb (map #(nth lb %) ; make sure all labels are included
-               (for [i (range (- 25 k))] (Math/floor (* k ^double (rand))))))))]
+               (for [i (range (- 25 k))] (Math/floor (double (* k (rand)))))))))]
     (testing "error+derivatives should produce a function to compute errors and deriv"
       (let [[fval gval] (error+derivatives @net (first (:batches ts)))]
         (is (= java.lang.Double (type fval)))
