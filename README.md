@@ -66,7 +66,40 @@ But you can also easily create your own training set:
 There are many options you can specify to customize the training algorithm to
 your taste.
 
-## Examples
+## Examples v0.2
+
+```clojure
+(require '[synaptic.core :refer :all])
+
+(def trset (load-training-set "mnist10k"))
+```
+
+- Classic perceptron (has only 1 layer and uses misclassification cost function 
+instead of cross-entropy).
+
+```clojure
+(def net (mlp [784 10] :binary-threshold (training :perceptron)))
+```
+
+- Multi-layer perceptron with 784 input units, 100 hidden units, and 10 output units.  Initialize backpropagation training with a learning rate of 0.001:
+
+```clojure
+(def net (mlp [784 100 10] [:sigmoid :softmax]
+              (training :backprop {:learning-rate {:epsilon 0.001}})))
+```
+
+- Neural net with an input layer of 28x28 fields, a convolution layer with 3 9x9 fieldmaps and 2x2 pooling, and a fully connected layer with 10 output units.
+
+```clojure
+(def net (neural-net [{:type :input :fieldsize [28 28]}
+                      {:type :convolution :act-fn :hyperbolic-tangent
+                       :feature-map {:size [9 9] :k 3}
+                       :pool {:kind :max :size [2 2]}}
+                      {:type :fully-connected :act-fn :sigmoid :n 10}]
+                     (training :backprop {:learning-rate {:epsilon 0.01}})))
+```
+
+## Examples v0.1
 
 - Classic perceptron (has only 1 layer and uses misclassification cost function 
 instead of cross-entropy).
