@@ -40,9 +40,9 @@ You can then experiment in the REPL as follows:
 (require '[clatrix.core :as m])   ; optional, to manipulate matrices
 
 (def trset (u/loaddata "trainingset" "mnist10k"))   ; load MNIST training set
-(def net (neural-net [784 100 10]             ; net with 784 inputs, 100 hidden units
-                     [:sigmoid :softmax]      ; and 10 (softmax) outputs
-                     (training :backprop)))   ; to be trained with backpropagation
+(def net (mlp [784 100 10]             ; net with 784 inputs, 100 hidden units
+              [:sigmoid :softmax]      ; and 10 (softmax) outputs
+              (training :backprop)))   ; to be trained with backpropagation
 
 (train net trset 10)              ; train the network for 10 epochs (returns a future)
 @*1                               ; (deref to wait for the future to complete)
