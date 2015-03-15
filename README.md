@@ -20,7 +20,7 @@ using various algorithms such as:
 - R-prop
 - RMSprop
 - L1 & L2 regularization
-- convolution / pooling layers (initial implementation)
+- convolution / pooling layers
 
 It also allows to play with various training parameters like learning
 rate and momentum, and supports adaptive learning rate and variants of
@@ -32,14 +32,13 @@ To use Synaptic, first add this to your `project.clj`:
 
 [![Clojars Project](http://clojars.org/synaptic/latest-version.svg)](http://clojars.org/synaptic)
 
-You can then experiment in the REPL as follows:
+You can then experiment in the REPL as follows (example for v0.2):
 
 ```clojure
 (require '[synaptic.core :refer :all])
-(require '[synaptic.util :as u])
 (require '[clatrix.core :as m])   ; optional, to manipulate matrices
 
-(def trset (u/loaddata "trainingset" "mnist10k"))   ; load MNIST training set
+(def trset (load-training-set "mnist10k"))   ; load MNIST training set
 (def net (mlp [784 100 10]             ; net with 784 inputs, 100 hidden units
               [:sigmoid :softmax]      ; and 10 (softmax) outputs
               (training :backprop)))   ; to be trained with backpropagation

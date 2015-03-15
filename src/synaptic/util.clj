@@ -4,27 +4,28 @@
   synaptic.util
   (:require [clatrix.core :as m])
   (:import [java.io DataInputStream File FileInputStream FileWriter]
+           [java.util Random]
            [org.jblas DoubleMatrix]))
 
 
 ; Random numbers
 
-(def rand-gen (java.util.Random.))
+(def rand-gen (Random.))
 
 (defn rand-set!
   "Set the seed of the random number generator."
   [seed]
-  (.setSeed rand-gen seed))
+  (.setSeed ^Random rand-gen seed))
 
 (defn nrand
   "Get a random sample of a normal distribution."
   []
-  (.nextGaussian rand-gen))
+  (.nextGaussian ^Random rand-gen))
 
 (defn random
   "Get a random sample of a uniform distribution."
   []
-  (.nextFloat rand-gen))
+  (.nextFloat ^Random rand-gen))
 
 ; Bit array manipulation
 
@@ -37,7 +38,7 @@
          bits []]
     (if (empty? data)
       (if (= 128 mask) bits (conj bits acc))
-      (let [b (+ acc (* mask (first data)))]
+      (let [b (int (+ acc (* mask (first data))))]
         (if (= 1 mask)
           (recur (rest data) 128 0 (conj bits b))
           (recur (rest data) (quot mask 2) b bits))))))
@@ -197,15 +198,15 @@
   [datakind]
   (let [prefix (str datakind ".")]
     (mapv #(apply str (drop (count prefix) %))
-          (filter #(.startsWith % prefix)
-                  (map #(.getName %) (file-seq (File. datadir)))))))
+          (filter #(.startsWith ^String % prefix)
+                  (map #(.getName ^File %) (file-seq (File. ^String datadir)))))))
 
 ; Load data in IDX format
 
 (defn read-samples-idx
   "Read samples (images) from a file encoded in IDX format."
   [fname]
-  (let [f    (File. fname)
+  (let [f    (File. ^String fname)
         dis  (DataInputStream. (FileInputStream. f))
         mn   (.readInt dis)]
     (assert (= mn 2051))
@@ -221,7 +222,7 @@
 (defn read-labels-idx
   "Read labels from a file encoded in IDX format."
   [fname]
-  (let [f    (File. fname)
+  (let [f    (File. ^String fname)
         dis  (DataInputStream. (FileInputStream. f))
         mn   (.readInt dis)]
     (assert (= mn 2049))
