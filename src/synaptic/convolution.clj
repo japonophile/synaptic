@@ -106,15 +106,20 @@
         dEdz (m/mult dEdy dydz)]
     dEdz))
 
+(defmethod handle-pooling
+  :convolution
+  [layers l dEdz ay]
+  (if (:pool (nth layers l))
+    (let [[kin win hin k wc hc wout hout w h] (convolution-layer-dimensions layers l)
+          indices (:i ay)]
+      (assign-row-elements-by-index (* k wc hc) dEdz indices))
+    dEdz))
+
 (defmethod layer-error-deriv-wrt-weights
   :convolution
   [layers l dEdz-out ax ay]
   (let [[kin win hin k wc hc wout hout w h] (convolution-layer-dimensions layers l)
-        x        (:a ax)
-        indices  (:i ay)
-        dEdz-out (if (:pool (nth layers l))
-                   (assign-row-elements-by-index (* k wc hc) dEdz-out indices)
-                   dEdz-out)
-        dEdw     (sum-contributions x dEdz-out kin win hin wc hc)]
+        x    (:a ax)
+        dEdw (sum-contributions x dEdz-out kin win hin wc hc)]
     dEdw))
 

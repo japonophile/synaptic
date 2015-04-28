@@ -132,6 +132,14 @@
   "Compute the layer dEdw, based on dEdz-out and x and y."
   (fn [layers l dEdz-out ax ay] (:type (nth layers l))))
 
+(defmulti handle-pooling
+  (fn [layers l dEdz ay] (:type (nth layers l))))
+
+(defmethod handle-pooling
+  :default
+  [layers l dEdz ay]
+  dEdz)
+
 (defn error-derivatives-wrt-logit
   "Compute the error derivatives wrt logit for all layers of the network, by 
   backpropagating it from the output layer down to the first layer."
@@ -140,7 +148,13 @@
     (loop [l last-layer-l, ws ws, ys (butlast ys), dEdzs [dEdz-out]]
       (if (> l 1)
         (let [dEdz (prev-layer-error-deriv-wrt-logit
-                     layers l (first dEdzs) (last ys) (last ws))]
+                     layers l (first dEdzs) (last ys) (last ws))
+              ; FIXME not very nice to have to deal with pooling here
+              ; as it is specific to convolution layers. the problem is
+              ; (notice the (dec l) layer index) that pooling needs to
+              ; be done at the previous layer using indices in (last ys)
+              ; Could this be solved by introducing separate pooling layers?
+              dEdz (handle-pooling layers (dec l) dEdz (last ys))]
           (recur (dec l) (butlast ws) (butlast ys) (cons dEdz dEdzs)))
         (vec dEdzs)))))
 

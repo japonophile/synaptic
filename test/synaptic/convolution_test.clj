@@ -180,5 +180,23 @@
       (is (= [[2 76] [1 9]] (mapv m/size (:weights nn))))
       (is (= [[2 76] [1 9]] (mapv m/size dEdws)))
       (is (= (count dEdws) (count dEdws-approx) 2))
+      (is (close-enough? dEdws dEdws-approx))))
+  (testing "error-derivatives with 2 pooling convolution layers"
+    (let [nn @(neural-net [{:type :input :fieldsize [3 14 14]}
+                           {:type :convolution :feature-map {:size [5 5] :k 4}
+                            :act-fn :hyperbolic-tangent
+                            :pool {:kind :max :size [2 2]}}
+                           {:type :convolution :feature-map {:size [2 2] :k 2}
+                            :act-fn :hyperbolic-tangent
+                            :pool {:kind :max :size [2 2]}}
+                           {:type :fully-connected :n 1 :act-fn :sigmoid}]
+                          (training :backprop))
+          ds (DataSet. (m/rand 10 (* 3 14 14))
+                       (m/matrix (map #(if (> % 0.5) 1.0 0.0) (m/rand 10 1))))
+          dEdws        (error-derivatives nn ds)
+          dEdws-approx (gradient-approx nn ds)]
+      (is (= [[4 76] [2 17] [1 9]] (mapv m/size (:weights nn))))
+      (is (= [[4 76] [2 17] [1 9]] (mapv m/size dEdws)))
+      (is (= (count dEdws) (count dEdws-approx) 3))
       (is (close-enough? dEdws dEdws-approx)))))
 
