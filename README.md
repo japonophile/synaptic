@@ -32,7 +32,7 @@ To use Synaptic, first add this to your `project.clj`:
 
 [![Clojars Project](http://clojars.org/synaptic/latest-version.svg)](http://clojars.org/synaptic)
 
-You can then experiment in the REPL as follows (example for v0.2):
+You can then experiment in the REPL as follows:
 
 ```clojure
 (require '[synaptic.core :refer :all])
@@ -52,7 +52,7 @@ You can then experiment in the REPL as follows (example for v0.2):
 Note: you may want to do `export JVM_OPTS="-Xmx1024m"` before starting your
 REPL to make sure you have enough memory to load the training set.
 
-Synaptic ships with a subset of the
+Synaptic github repository includes a subset of the
 [MNIST handwritten digit](http://yann.lecun.com/exdb/mnist/)
 training data available on Yann LeCun's website, so you can experiment.
 
@@ -65,7 +65,7 @@ But you can also easily create your own training set:
 There are many options you can specify to customize the training algorithm to
 your taste.
 
-## Examples v0.2
+## Examples
 
 ```clojure
 (require '[synaptic.core :refer :all])
@@ -98,35 +98,19 @@ instead of cross-entropy).
                      (training :backprop {:learning-rate {:epsilon 0.01}})))
 ```
 
-## Examples v0.1
-
-- Classic perceptron (has only 1 layer and uses misclassification cost function 
-instead of cross-entropy).
-
-```clojure
-(def net (neural-net [784 10] :binary-threshold (training :perceptron)))
-```
-
-- Specify learning rate of 0.001:
-
-```clojure
-(def net (neural-net [784 100 10] [:sigmoid :softmax]
-                     (training :backprop {:learning-rate {:epsilon 0.001}})))
-```
-
 - Specify adaptive learning rate with min and max gain of 0.01 and 10.0:
 
 ```clojure
-(def net (neural-net [784 100 10] [:sigmoid :softmax]
-                     (training :backprop
-                      {:learning-rate {:epsilon 0.01 :adaptive true
-                                       :ming 0.01 :maxg 10.0}})))
+(def net (mlp [784 100 10] [:sigmoid :softmax]
+              (training :backprop
+              {:learning-rate {:epsilon 0.01 :adaptive true
+                               :ming 0.01 :maxg 10.0}})))
 ```
 
 - Use L-BFGS unconstrained optimization algorithm instead of backprop:
 
 ```clojure
-(def net (neural-net [784 100 10] [:sigmoid :softmax] (training :lbfgs)))
+(def net (mlp [784 100 10] [:sigmoid :softmax] (training :lbfgs)))
 ```
 
 ## How to monitor training
