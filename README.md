@@ -32,11 +32,20 @@ To use Synaptic, first add this to your `project.clj`:
 
 [![Clojars Project](http://clojars.org/synaptic/latest-version.svg)](http://clojars.org/synaptic)
 
-You can then experiment in the REPL as follows:
+You can then experiment in the REPL.
+
+First, make sure you have a directory called `data` in your project, where you copy the 
+training set (you can use the mnist10k training set provided in Synaptic git repo).
+
+```
+$ ls data/
+data/trainingset.mnist10k
+```
+
+Next, open your REPL, load the training set and create a neural net, as follows:
 
 ```clojure
 (require '[synaptic.core :refer :all])
-(require '[clatrix.core :as m])   ; optional, to manipulate matrices
 
 (def trset (load-training-set "mnist10k"))   ; load MNIST training set
 (def net (mlp [784 100 10]             ; net with 784 inputs, 100 hidden units
