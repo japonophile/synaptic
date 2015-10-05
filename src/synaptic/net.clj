@@ -264,7 +264,7 @@
         y  (m/dense (:a (last (net-activities nn x))))
         n  (count (first y))
         ci (mapv #(apply max-key % (range n)) y)
-        cs (-> nn :header :labels)]
+        cs (vec (keys (-> nn :header :labelmap)))]
     (if cs
       (mapv #(get cs %) ci)
       ci)))

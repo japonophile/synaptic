@@ -146,13 +146,13 @@
   (vec (for [i (range n)] (assoc (vec (repeat n 0)) i 1))))
 
 (defn tobinary
-  "Encode labels to a vector with 0 and 1. Also returns the vector of
+  "Encode labels to a vector with 0 and 1. Also returns the map of
   unique labels to decode them."
   [labels]
   (let [uniquelabels (unique labels)
         lbcodes      (bincodes (count uniquelabels))
         lb2code      (zipmap uniquelabels lbcodes)]
-    [(mapv lb2code labels) uniquelabels]))
+    [(mapv lb2code labels) (zipmap lbcodes uniquelabels)]))
 
 (defn frombinary
   "Decode a vector of 0 and 1 to the original label, based on a vector
@@ -161,6 +161,23 @@
   (let [lbcodes      (bincodes (count uniquelabels))
         code2lb      (zipmap lbcodes uniquelabels)]
     (mapv code2lb encodedlabels)))
+
+; Continous scaling
+
+(defn scale-labels
+  "Scale set of labels to range 0 to 1."
+  [mat]
+  (let  [smallest-element   (apply min (flatten mat))
+         largest-element    (apply max (flatten mat))
+         shifted-representation  (m/- (m/matrix mat) smallest-element)]
+        (m/to-vecs (m/div shifted-representation  (m/- largest-element smallest-element)))))
+
+(defn tocontinous
+  "Encode labels to a vector with numbers in range 0 to 1. Also returns the map of
+  unique labels to decode them."
+  [labels]
+  (let [uniquelabels (unique labels)]
+    [(scale-labels labels) (zipmap (scale-labels uniquelabels) uniquelabels)]))
 
 ; Make clatrix matrices printable and readable in EDN format
 

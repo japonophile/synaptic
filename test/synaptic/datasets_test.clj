@@ -31,12 +31,12 @@
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
             vs   (:valid ts)
-            ulbs (-> ts :header :labels)]
+            ulbs (-> ts :header :labelmap)]
         (is (vector? bs))
         (is (= 5 (count bs)))
         (is (every? #(= DataSet (type %)) bs))
         (is (nil? vs))
-        (is (= ["a" "b"] ulbs))
+        (is (= {[0 1] "b", [1 0] "a"} ulbs))
         (let [x (:x (first bs))
               y (:y (first bs))]
           (is (m/matrix? x))
@@ -49,12 +49,12 @@
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
             vs   (:valid ts)
-            ulbs (-> ts :header :labels)]
+            ulbs (-> ts :header :labelmap)]
         (is (vector? bs))
         (is (= 1 (count bs)))
         (is (= DataSet (type (first bs))))
         (is (= DataSet (type vs)))
-        (is (= ["0" "1" "2" "3"] ulbs))
+        (is (= {[0 0 0 1] "3", [0 0 1 0] "2", [0 1 0 0] "1", [1 0 0 0] "0"} ulbs))
         (let [x (:x (first bs))
               y (:y (first bs))]
           (is (m/matrix? x))
@@ -72,12 +72,12 @@
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
             vs   (:valid ts)
-            ulbs (-> ts :header :labels)]
+            ulbs (-> ts :header :labelmap)]
         (is (vector? bs))
         (is (= 5 (count bs)))
         (is (= DataSet (type (first bs))))
         (is (nil? vs))
-        (is (= ["+" "-"] ulbs))
+        (is (= {[0 1] "-", [1 0] "+"} ulbs))
         (is (every? true? (map #(= [(map double %1)]
                                    (m/dense (:x %2))) smp bs)))))))
 
