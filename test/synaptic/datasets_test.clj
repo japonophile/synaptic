@@ -31,7 +31,7 @@
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
             vs   (:valid ts)
-            ulbs (-> ts :header :labelmap)]
+            ulbs (-> ts :header :labeltranslator)]
         (is (vector? bs))
         (is (= 5 (count bs)))
         (is (every? #(= DataSet (type %)) bs))
@@ -49,7 +49,7 @@
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
             vs   (:valid ts)
-            ulbs (-> ts :header :labelmap)]
+            ulbs (-> ts :header :labeltranslator)]
         (is (vector? bs))
         (is (= 1 (count bs)))
         (is (= DataSet (type (first bs))))
@@ -72,7 +72,7 @@
       (is (= TrainingSet (type ts)))
       (let [bs   (:batches ts)
             vs   (:valid ts)
-            ulbs (-> ts :header :labelmap)]
+            ulbs (-> ts :header :labeltranslator)]
         (is (vector? bs))
         (is (= 5 (count bs)))
         (is (= DataSet (type (first bs))))

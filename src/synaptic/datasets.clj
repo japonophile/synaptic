@@ -2,8 +2,7 @@
   ^{:doc "synaptic - data sets"
     :author "Antoine Choppin"}
   synaptic.datasets
-  (:require [clojure.set :refer [rename-keys]] 
-            [clatrix.core :as m]
+  (:require [clatrix.core :as m]
             [synaptic.util :as u])
   (:gen-class))
 
@@ -81,8 +80,10 @@
 
 (defn count-labels
   "Create a map with number of occurrence of each label."
-  [uniquelabelmap encodedlabels]
-  (rename-keys (frequencies encodedlabels) uniquelabelmap))
+  [labeltranslator encodedlabels]
+  (let [translate-keys #(zipmap (mapv labeltranslator (keys %))
+                                (vals %))]
+    (translate-keys (frequencies encodedlabels))))
 
 (defn training-set
   "Create a training set from samples and associated labels.
@@ -105,7 +106,7 @@
   (let [batchsize  (if (:online options) 1 (:batch options))
         trainsize  (if (:nvalid options) (- (count samples) (:nvalid options)))
         randomize  (if (nil? (:rand options)) true (:rand options))
-        [reglb uniquelbmap]    (if (:continous options) (u/tocontinous labels) (u/tobinary labels))
+        [reglb lbtranslator]  (if (:continous options) (u/tocontinous labels) (u/tobinary labels))
         [smp lb]   (if randomize (shuffle-vecs samples reglb) [samples reglb])
         [trainsmp validsmp] (if trainsize (split-at trainsize smp) [smp nil])
         [trainlb  validlb]  (if trainsize (split-at trainsize lb) [lb nil])
@@ -118,9 +119,9 @@
                     :type (:type options)
                     :fieldsize (or (:fieldsize options)
                                    (u/divisors (count (first samples))))
-                    :batches (mapv (partial count-labels uniquelbmap) batchlb)
-                    :valid (count-labels uniquelbmap validlb)
-                    :labelmap uniquelbmap}]
+                    :batches (mapv (partial count-labels lbtranslator) batchlb)
+                    :valid (count-labels lbtranslator validlb)
+                    :labeltranslator lbtranslator}]
     (TrainingSet. header trainsets validset)))
 
 (defn test-set

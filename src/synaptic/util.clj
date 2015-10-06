@@ -164,20 +164,16 @@
 
 ; Continous scaling
 
-(defn scale-labels
-  "Scale set of labels to range 0 to 1."
-  [mat]
-  (let  [smallest-element   (apply min (flatten mat))
-         largest-element    (apply max (flatten mat))
-         shifted-representation  (m/- (m/matrix mat) smallest-element)]
-        (m/to-vecs (m/div shifted-representation  (m/- largest-element smallest-element)))))
-
 (defn tocontinous
-  "Encode labels to a vector with numbers in range 0 to 1. Also returns the map of
-  unique labels to decode them."
+  "Encode labels to vectors with numbers in range 0 to 1
+  and a function to decode them."
   [labels]
-  (let [uniquelabels (unique labels)]
-    [(scale-labels labels) (zipmap (scale-labels uniquelabels) uniquelabels)]))
+  (let  [smallest-element   (apply min (flatten labels))
+         largest-element    (apply max (flatten labels))
+         scaling-factor     (m/- largest-element smallest-element)
+         shifted-representation  (m/- (m/matrix labels) smallest-element)]
+        [(m/to-vecs (m/div shifted-representation scaling-factor))
+         #(m/+ smallest-element (m/mult (m/matrix %) scaling-factor))]))
 
 ; Make clatrix matrices printable and readable in EDN format
 

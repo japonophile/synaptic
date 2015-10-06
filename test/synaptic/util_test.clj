@@ -115,10 +115,11 @@
 
 (deftest test-continous-scaling
   (testing "tocontinous should return the vector of unique labels and all labels
-           scaled to vectors with values in range 0 to 1"
-    (is (= [[[0.4 0.6] [0.8 1.0] [0.0 0.2]]
-            {[0.8 1.0] [3 4], [0.4 0.6] [1 2], [0.0 0.2] [-1 0]}] 
-           (tocontinous [[1 2] [3 4] [-1 0]])))))
+           scaled to vectors with values in range 0 to 1, and a function to scale them back"
+    (is (= [[0.4 0.6] [0.8 1.0] [0.0 0.2]] 
+           (first (tocontinous [[1 2] [3 4] [-1 0]]))))
+    (is (= (m/matrix [[-1 4]])
+           ((second (tocontinous [[1 2] [3 4] [-1 0]])) [[0 1]])))))
 
 (deftest test-data-manipulation
   (testing "unique should return a sorted vector of unique values"

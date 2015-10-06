@@ -256,16 +256,14 @@
         as))))
 
 (defn estimate
-  "Estimate classes for a given data set, by computing network output for each
-  sample of the data set, and returns the most probable class (label) - or its
-  index if labels are not defined."
+  "Estimate labels for a given data set, by computing network output for each
+  sample of the data set, and returns appropriately transformed result
+  - or its index if labels are not defined."
   [^Net nn ^DataSet dset]
-  (let [x  (:x dset)
-        y  (m/dense (:a (last (net-activities nn x))))
-        n  (count (first y))
-        ci (mapv #(apply max-key % (range n)) y)
-        cs (vec (keys (-> nn :header :labelmap)))]
-    (if cs
-      (mapv #(get cs %) ci)
-      ci)))
-
+  (let [x           (:x dset)
+        y           (m/dense (:a (last (net-activities nn x))))
+        label-size  (count (first y))
+        lbtranslator (-> dset :header :labeltranslator)]
+    (if lbtranslator
+      (mapv lbtranslator y)
+      (mapv #(apply max-key % (range label-size)) y))))
