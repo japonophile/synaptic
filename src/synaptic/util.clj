@@ -162,11 +162,11 @@
         code2lb      (zipmap lbcodes uniquelabels)]
     (mapv code2lb encodedlabels)))
 
-; Continous scaling
+; continuous scaling
 
-(defn tocontinous
+(defn tocontinuous
   "Encode labels to vectors with numbers in range 0 to 1
-  and a function to decode them."
+  and return a function to decode them."
   [labels]
   (let  [smallest-element   (apply min (flatten labels))
          largest-element    (apply max (flatten labels))

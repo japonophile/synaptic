@@ -104,7 +104,7 @@
   (testing "tobinary should return the vector of unique labels and all labels
            encoded to binary vectors"
     (is (= [[[0 0 0 1] [1 0 0 0] [0 1 0 0] [0 0 0 1] [0 0 1 0] [1 0 0 0] [0 0 1 0]]
-            {[0 0 0 1] "8", [0 0 1 0] "3", [0 1 0 0] "2", [1 0 0 0] "1"}] 
+            {[0 0 0 1] "8", [0 0 1 0] "3", [0 1 0 0] "2", [1 0 0 0] "1"}]
            (tobinary ["8" "1" "2" "8" "3" "1" "3"]))))
   (testing "frombinary should decode each label to its original value, based
            on a vector of unique labels"
@@ -113,13 +113,13 @@
                        [[0 0 0 1] [1 0 0 0] [0 1 0 0] [0 0 0 1]
                         [0 0 1 0] [1 0 0 0] [0 0 1 0]])))))
 
-(deftest test-continous-scaling
-  (testing "tocontinous should return the vector of unique labels and all labels
+(deftest test-continuous-scaling
+  (testing "tocontinuous should return the vector of unique labels and all labels
            scaled to vectors with values in range 0 to 1, and a function to scale them back"
-    (is (= [[0.4 0.6] [0.8 1.0] [0.0 0.2]] 
-           (first (tocontinous [[1 2] [3 4] [-1 0]]))))
+    (is (= [[0.4 0.6] [0.8 1.0] [0.0 0.2]]
+           (first (tocontinuous [[1 2] [3 4] [-1 0]]))))
     (is (= (m/matrix [[-1 4]])
-           ((second (tocontinous [[1 2] [3 4] [-1 0]])) [[0 1]])))))
+           ((second (tocontinuous [[1 2] [3 4] [-1 0]])) [[0 1]])))))
 
 (deftest test-data-manipulation
   (testing "unique should return a sorted vector of unique values"
