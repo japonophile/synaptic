@@ -263,7 +263,7 @@
   (let [x           (:x dset)
         y           (m/dense (:a (last (net-activities nn x))))
         label-size  (count (first y))
-        lbtranslator (-> dset :header :labeltranslator)]
+        lbtranslator (-> nn :arch :labeltranslator)]
     (if lbtranslator
       (mapv lbtranslator y)
       (mapv #(apply max-key % (range label-size)) y))))

@@ -623,12 +623,18 @@
   as the training progresses."
   (fn [net _ _] (-> @net :training :algo)))
 
+(defn initialize-train
+  "First step in train procedure"
+  [net ^TrainingSet trset]
+  (swap! net assoc-in [:training :state :state] :training)
+  (swap! net init-stats)
+  (swap! net assoc-in [:arch :labeltranslator] (-> trset :header :labeltranslator)))
+
 (defmethod train
   :lbfgs
   [net ^TrainingSet trset nepochs]
   (future
-    (swap! net assoc-in [:training :state :state] :training)
-    (swap! net init-stats)
+    (initialize-train net trset) 
     (let [l         (-> @net :arch :layers)
           b         (d/merge-batches (:batches trset))
           w0        (weights-to-double-array (:weights @net))
@@ -654,8 +660,7 @@
   :default
   [net ^TrainingSet trset nepochs]
   (future
-    (swap! net assoc-in [:training :state :state] :training)
-    (swap! net init-stats)
+    (initialize-train net trset)
     (let [maxep (+ nepochs (-> @net :training :stats :epochs))
           all-batches (:batches trset)]
       (loop [batches all-batches]
