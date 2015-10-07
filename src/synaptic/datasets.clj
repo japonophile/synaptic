@@ -130,7 +130,7 @@
   
   Options:
     :name        - a name for the test set
-    :type        - the type of training data (e.g. :binary-image, :grayscale-image ...)
+    :type        - the type of test data (e.g. :binary-image, :grayscale-image ...)
     :fieldsize   - [width height] of each sample data (for images)
     :rand true   - set this flag to shuffle samples."
   [samples & [options]]

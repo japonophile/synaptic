@@ -1,4 +1,4 @@
-(defproject synaptic "0.3.0-SNAPSHOT"
+(defproject keorn/synaptic "0.3.0-SNAPSHOT"
   :description "Neural Networks in Clojure"
   :url "https://github.com/japonophile/synaptic"
   :license {:name "Eclipse Public License"
