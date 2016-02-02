@@ -80,10 +80,10 @@
 
 (defn count-labels
   "Create a map with number of occurrence of each label."
-  [uniquelabels binlabels]
-  (let [binlb2cnt (reduce (fn [lbmap lb] (assoc lbmap lb (inc (get lbmap lb 0))))
-                          {} binlabels)]
-    (zipmap (u/frombinary uniquelabels (keys binlb2cnt)) (vals binlb2cnt))))
+  [labeltranslator encodedlabels]
+  (let [translate-keys #(zipmap (mapv labeltranslator (keys %))
+                                (vals %))]
+    (translate-keys (frequencies encodedlabels))))
 
 (defn training-set
   "Create a training set from samples and associated labels.
@@ -91,22 +91,23 @@
   It also has a map that will allow converting y's back to the original labels.
   
   Options:
-    :name        - a name for the training set
-    :type        - the type of training data (e.g. :binary-image, :grayscale-image ...)
-    :fieldsize   - [width height] of each sample data (for images)
-    :nvalid      - size of the validation set (default is 0, i.e. no validation set)
-    :batch       - size of a mini-batch (default is the number of samples, after
-                   having set apart the validation set)
-    :online true - set this flag for online training (same as batch size = 1)
-    :rand false  - unset this flag to keep original ordering (by default, samples
-                   will be shuffled before partitioning)."
+    :name           - a name for the training set
+    :type           - the type of training data (e.g. :binary-image, :grayscale-image ...)
+    :continuous true - set this flag to use continuous labels (auto-scaled to between 0 and 1)
+    :fieldsize      - [width height] of each sample data (for images)
+    :nvalid         - size of the validation set (default is 0, i.e. no validation set)
+    :batch          - size of a mini-batch (default is the number of samples, after
+                      having set apart the validation set)
+    :online true    - set this flag for online training (same as batch size = 1)
+    :rand false     - unset this flag to keep original ordering (by default, samples
+                      will be shuffled before partitioning)."
   [samples labels & [options]]
   {:pre [(= (count samples) (count labels))]}
   (let [batchsize  (if (:online options) 1 (:batch options))
         trainsize  (if (:nvalid options) (- (count samples) (:nvalid options)))
         randomize  (if (nil? (:rand options)) true (:rand options))
-        [binlb uniquelb]    (u/tobinary labels)
-        [smp lb]   (if randomize (shuffle-vecs samples binlb) [samples binlb])
+        [reglb lbtranslator]  (if (:continuous options) (u/tocontinuous labels) (u/tobinary labels))
+        [smp lb]   (if randomize (shuffle-vecs samples reglb) [samples reglb])
         [trainsmp validsmp] (if trainsize (split-at trainsize smp) [smp nil])
         [trainlb  validlb]  (if trainsize (split-at trainsize lb) [lb nil])
         [batchsmp batchlb]  (partition-vecs batchsize trainsmp trainlb)
@@ -118,9 +119,9 @@
                     :type (:type options)
                     :fieldsize (or (:fieldsize options)
                                    (u/divisors (count (first samples))))
-                    :batches (mapv (partial count-labels uniquelb) batchlb)
-                    :valid (count-labels uniquelb validlb)
-                    :labels uniquelb}]
+                    :batches (mapv (partial count-labels lbtranslator) batchlb)
+                    :valid (count-labels lbtranslator validlb)
+                    :labeltranslator lbtranslator}]
     (TrainingSet. header trainsets validset)))
 
 (defn test-set
@@ -129,7 +130,7 @@
   
   Options:
     :name        - a name for the test set
-    :type        - the type of training data (e.g. :binary-image, :grayscale-image ...)
+    :type        - the type of test data (e.g. :binary-image, :grayscale-image ...)
     :fieldsize   - [width height] of each sample data (for images)
     :rand true   - set this flag to shuffle samples."
   [samples & [options]]

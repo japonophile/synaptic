@@ -39,6 +39,9 @@
   (testing "sigmoid"
     (is (m-quasi-equal? [[0.25 0.2]]
                         (sigmoid (m/matrix [[(Math/log 1/3) (Math/log 1/4)]])))))
+  (testing "relu"
+    (is (m-quasi-equal? [[0. 0.2]]
+                        (relu (m/matrix [[-10. 0.2]])))))
   (testing "hyperbolic-tangent"
     (is (m-quasi-equal? [[0.7615942 0.9640276 0.9950548]]
                         (hyperbolic-tangent (m/matrix [[1 2 3]])))))

@@ -111,7 +111,8 @@
   (case actkind
     :softmax            (fn [ys] (m/mult ys (m/- 1.0 ys)))
     :sigmoid            (fn [ys] (m/mult ys (m/- 1.0 ys)))
-    :hyperbolic-tangent (fn [ys] (m/- 1.0 (m/mult ys ys)))))
+    :hyperbolic-tangent (fn [ys] (m/- 1.0 (m/mult ys ys)))
+    :relu               (fn [ys] (m/map #(if (<= % 0) 0. 1.)))))
 
 (defn output-layer-error-deriv
   "Returns the function to compute the error derivative of the output layer
@@ -623,12 +624,18 @@
   as the training progresses."
   (fn [net _ _] (-> @net :training :algo)))
 
+(defn initialize-train
+  "First step in train procedure"
+  [net ^TrainingSet trset]
+  (swap! net assoc-in [:training :state :state] :training)
+  (swap! net init-stats)
+  (swap! net assoc-in [:arch :labeltranslator] (-> trset :header :labeltranslator)))
+
 (defmethod train
   :lbfgs
   [net ^TrainingSet trset nepochs]
   (future
-    (swap! net assoc-in [:training :state :state] :training)
-    (swap! net init-stats)
+    (initialize-train net trset) 
     (let [l         (-> @net :arch :layers)
           b         (d/merge-batches (:batches trset))
           w0        (weights-to-double-array (:weights @net))
@@ -654,8 +661,7 @@
   :default
   [net ^TrainingSet trset nepochs]
   (future
-    (swap! net assoc-in [:training :state :state] :training)
-    (swap! net init-stats)
+    (initialize-train net trset)
     (let [maxep (+ nepochs (-> @net :training :stats :epochs))
           all-batches (:batches trset)]
       (loop [batches all-batches]
