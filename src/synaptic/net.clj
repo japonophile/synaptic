@@ -111,6 +111,11 @@
   [zs]
   (m/map (fn [z] (if (>= z 0) 1 -1)) zs))
 
+(defn relu
+  "Rectified linear unit."
+  [zs]
+  (m/map #(if (<= % 0.) 0. %) zs))
+
 (defn sigmoid
   "Sigmoid activation function.
   Computed as 1 / (1 + e^(-z))."
@@ -259,8 +264,8 @@
   "Estimate labels for a given data set, by computing network output for each
   sample of the data set, and returns appropriately transformed result
   - or its index if labels are not defined."
-  [^Net nn dset]
-  (let [x           (if (contains? dset :x) (:x dset) dset)
+  [^Net nn ^DataSet dset]
+  (let [x           (:x dset)
         y           (m/dense (:a (last (net-activities nn x))))
         label-size  (count (first y))
         lbtranslator (-> nn :arch :labeltranslator)]

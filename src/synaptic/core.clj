@@ -39,6 +39,9 @@
 (def load-training-set-header d/load-training-set-header)
 (alter-meta! #'load-training-set-header merge
              (select-keys (meta #'d/load-training-set-header) [:doc :arglists]))
+(def dataset           d/dataset)
+(alter-meta! #'dataset merge
+             (select-keys (meta #'d/dataset)           [:doc :arglists]))
 (def training-set      d/training-set)
 (alter-meta! #'training-set merge
              (select-keys (meta #'d/training-set)      [:doc :arglists]))
