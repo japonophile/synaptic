@@ -111,7 +111,8 @@
   (case actkind
     :softmax            (fn [ys] (m/mult ys (m/- 1.0 ys)))
     :sigmoid            (fn [ys] (m/mult ys (m/- 1.0 ys)))
-    :hyperbolic-tangent (fn [ys] (m/- 1.0 (m/mult ys ys)))))
+    :hyperbolic-tangent (fn [ys] (m/- 1.0 (m/mult ys ys)))
+    :relu               (fn [ys] (m/map #(if (<= % 0) 0. 1.)))))
 
 (defn output-layer-error-deriv
   "Returns the function to compute the error derivative of the output layer
